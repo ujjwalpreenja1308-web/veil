@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { HealthIndicator } from "@/components/veil/HealthIndicator";
 import { AgentStatusBadge } from "@/components/veil/AgentStatusBadge";
 import { Bot } from "lucide-react";
-import { useAgents } from "@/hooks/use-agents";
+import { useAgents, usePrefetchAgent } from "@/hooks/use-agents";
 import type { HealthStatus } from "@/components/veil/HealthIndicator";
 
 const healthFromStatus = (status: string | null): HealthStatus => {
@@ -18,6 +18,7 @@ const healthFromStatus = (status: string | null): HealthStatus => {
 
 export default function AgentsPage() {
   const { data: agents, isLoading } = useAgents();
+  const prefetchAgent = usePrefetchAgent();
 
   return (
     <div className="space-y-6">
@@ -55,8 +56,12 @@ export default function AgentsPage() {
       ) : (
         <div className="space-y-2">
           {agents.map((agent) => (
-            <Link key={agent.id} href={`/dashboard/agents/${agent.id}`}>
-              <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+            <Link key={agent.id} href={`/dashboard/agents/${agent.id}`} className="block">
+              <Card
+                tabIndex={-1}
+                className="hover:bg-muted/50 transition-colors cursor-pointer"
+                onMouseEnter={() => prefetchAgent(agent.id)}
+              >
                 <CardContent className="flex items-center gap-4 py-4">
                   <HealthIndicator status={healthFromStatus(agent.last_session_status)} />
                   <span className="font-medium">{agent.name}</span>

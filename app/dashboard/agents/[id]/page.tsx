@@ -8,10 +8,12 @@ import { AgentStatusBadge } from "@/components/veil/AgentStatusBadge";
 import { FailureTypeTag } from "@/components/veil/FailureTypeTag";
 import { ArrowLeft, Bot } from "lucide-react";
 import { useAgent } from "@/hooks/use-agents";
+import { usePrefetchSession } from "@/hooks/use-sessions";
 import { formatDistanceToNow } from "date-fns";
 
 export default function AgentDetailPage({ params }: { params: { id: string } }) {
   const { data, isLoading } = useAgent(params.id);
+  const prefetchSession = usePrefetchSession();
 
   if (isLoading) {
     return (
@@ -74,8 +76,12 @@ export default function AgentDetailPage({ params }: { params: { id: string } }) 
         ) : (
           <div className="space-y-2">
             {sessions.map((session) => (
-              <Link key={session.id} href={`/dashboard/sessions/${session.id}`}>
-                <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+              <Link key={session.id} href={`/dashboard/sessions/${session.id}`} className="block">
+                <Card
+                  tabIndex={-1}
+                  className="hover:bg-muted/50 transition-colors cursor-pointer"
+                  onMouseEnter={() => prefetchSession(session.id)}
+                >
                   <CardContent className="flex items-center gap-4 py-4">
                     <code className="text-xs text-muted-foreground font-mono">{session.id.slice(0, 8)}</code>
                     <Badge variant={session.status === "failed" ? "destructive" : session.status === "running" ? "secondary" : "default"}>

@@ -7,7 +7,7 @@ import { HealthIndicator } from "@/components/veil/HealthIndicator";
 import { AgentStatusBadge } from "@/components/veil/AgentStatusBadge";
 import { Bot, ScrollText, AlertTriangle, DollarSign, Loader2 } from "lucide-react";
 import { useOverviewStats } from "@/hooks/use-stats";
-import { useAgents } from "@/hooks/use-agents";
+import { useAgents, usePrefetchAgent } from "@/hooks/use-agents";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { LiveBadge } from "@/components/veil/LiveBadge";
@@ -24,10 +24,9 @@ function useProvisioningStatus() {
   return useQuery({
     queryKey: ["me"],
     queryFn: () => apiFetch<{ provisioned: boolean }>("/api/me"),
-    staleTime: 0,
-    refetchInterval: (query) => {
-      return query.state.data?.provisioned ? false : 2000;
-    },
+    // Once provisioned, cache forever — never re-check on navigation
+    staleTime: (query) => query.state.data?.provisioned ? Infinity : 0,
+    refetchInterval: (query) => query.state.data?.provisioned ? false : 2000,
   });
 }
 
@@ -35,9 +34,10 @@ export default function DashboardPage() {
   const { data: me, isLoading: meLoading } = useProvisioningStatus();
   const { data: stats, isLoading: statsLoading, isFetching: statsFetching } = useOverviewStats();
   const { data: agents, isLoading: agentsLoading, isFetching: agentsFetching } = useAgents();
+  const prefetchAgent = usePrefetchAgent();
 
-  // Show provisioning screen until org is ready
-  if (meLoading || !me?.provisioned) {
+  // Show provisioning screen only on first load (no cached data yet)
+  if (meLoading && !me) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -119,8 +119,12 @@ export default function DashboardPage() {
         ) : (
           <div className="space-y-2">
             {agents.map((agent) => (
-              <Link key={agent.id} href={`/dashboard/agents/${agent.id}`}>
-                <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+              <Link key={agent.id} href={`/dashboard/agents/${agent.id}`} className="block">
+                <Card
+                  tabIndex={-1}
+                  className="hover:bg-muted/50 transition-colors cursor-pointer"
+                  onMouseEnter={() => prefetchAgent(agent.id)}
+                >
                   <CardContent className="flex items-center gap-4 py-4">
                     <HealthIndicator status={healthFromStatus(agent.last_session_status)} />
                     <span className="font-medium">{agent.name}</span>
