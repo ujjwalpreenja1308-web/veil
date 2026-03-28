@@ -9,7 +9,19 @@
       "Bash(npm run:*)",
       "Bash(ls /d/Veil.dev/app/api/agents/[id])",
       "Bash(npm install:*)",
-      "mcp__f3a25e5c-7d98-4424-bcc5-7571ba1845c6__apply_migration"
+      "mcp__f3a25e5c-7d98-4424-bcc5-7571ba1845c6__apply_migration",
+      "Bash(grep -E '\"\"tsx\"\"|\"\"dotenv\"\"' package.json)",
+      "Bash(npx tsx:*)",
+      "Bash(pip install:*)",
+      "mcp__f3a25e5c-7d98-4424-bcc5-7571ba1845c6__execute_sql",
+      "Bash(node -e \":*)",
+      "Bash(node -e \"const t = require\\(''@opentelemetry/otlp-transformer''\\); console.log\\(Object.keys\\(t\\).filter\\(k => k.toLowerCase\\(\\).includes\\(''trace''\\) || k.toLowerCase\\(\\).includes\\(''buffer''\\) || k.toLowerCase\\(\\).includes\\(''create''\\) || k.toLowerCase\\(\\).includes\\(''decode''\\)\\).slice\\(0,20\\)\\)\")",
+      "Bash(node -e \"const t = require\\(''@opentelemetry/otlp-transformer''\\); console.log\\(Object.keys\\(t.ProtobufTraceSerializer\\)\\)\")",
+      "Bash(node -e \"const t = require\\(''@opentelemetry/otlp-transformer''\\); console.log\\(Object.keys\\(t\\)\\)\")",
+      "Bash(python -c \"import openlit; import inspect; src = inspect.getfile\\(openlit\\); print\\(src\\)\")",
+      "Bash(python -c \":*)",
+      "Bash(find D:/Veil.dev/node_modules/@opentelemetry/otlp-transformer/build/src -name *.d.ts)",
+      "Bash(xargs grep:*)"
     ]
   }
 }

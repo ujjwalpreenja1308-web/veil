@@ -24,8 +24,8 @@ function useProvisioningStatus() {
   return useQuery({
     queryKey: ["me"],
     queryFn: () => apiFetch<{ provisioned: boolean }>("/api/me"),
+    staleTime: 0,
     refetchInterval: (query) => {
-      // Poll every 2s until provisioned
       return query.state.data?.provisioned ? false : 2000;
     },
   });

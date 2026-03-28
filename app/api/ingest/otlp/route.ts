@@ -57,12 +57,29 @@ export async function POST(req: NextRequest) {
 
   const orgId = org.id;
 
+  const contentType = req.headers.get("content-type") ?? "";
+  const pathname = req.nextUrl.pathname;
+
   let body: unknown;
   try {
-    body = await req.json();
+    if (contentType.includes("application/json")) {
+      body = await req.json();
+    } else {
+      // Protobuf binary — decode using internal OTLP proto definitions
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const root = require("@opentelemetry/otlp-transformer/build/src/generated/root");
+      const buf = new Uint8Array(await req.arrayBuffer());
+      if (pathname.includes("/logs")) {
+        const decoded = root.opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest.decode(buf);
+        body = decoded.toJSON();
+      } else {
+        const decoded = root.opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest.decode(buf);
+        body = decoded.toJSON();
+      }
+    }
   } catch (err) {
-    logger.exception("[ingest/otlp] Failed to parse request body", err, { orgId });
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    logger.exception("[ingest/otlp] Failed to parse request body", err, { orgId, contentType });
+    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
   let events;

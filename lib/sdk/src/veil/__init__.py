@@ -66,12 +66,9 @@ def _start(api_key: str, endpoint: str, session_id: str) -> None:
 
     openlit.init(
         otlp_endpoint=otlp_endpoint,
-        # Pass api_key as an OTLP header so our ingest endpoint can auth
         otlp_headers=f"x-api-key={api_key}",
-        # Tag every span with the veil session id
         environment="production",
         application_name=session_id,
-        # Disable OpenLIT's own dashboard — we are the dashboard
         collect_gpu_stats=False,
     )
 
