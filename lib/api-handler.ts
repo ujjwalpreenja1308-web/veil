@@ -1,6 +1,7 @@
 // Shared API route utilities — consistent error handling, timeout, retry
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
+import { reportError } from "@/lib/error-reporter";
 
 // Wrap any async route handler to catch unhandled errors and return structured JSON
 export function withApiHandler<T extends unknown[]>(
@@ -11,6 +12,13 @@ export function withApiHandler<T extends unknown[]>(
       return await handler(...args);
     } catch (err) {
       logger.exception("[api] Unhandled route error", err);
+      // Infer route from request URL if available
+      const req = args.find((a): a is NextRequest => a instanceof NextRequest);
+      reportError({
+        route: req?.nextUrl?.pathname ?? "unknown",
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
       return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
   };

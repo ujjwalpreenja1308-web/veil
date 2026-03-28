@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { normalize } from "@/lib/normalizer";
 import { classify } from "@/lib/rules/engine";
 import { logger } from "@/lib/logger";
-import { ratelimit } from "@/lib/ratelimit";
+import { reportError } from "@/lib/error-reporter";
+import { checkRateLimit } from "@/lib/ratelimit";
 import { sendFailureAlert } from "@/lib/alerts/email";
 import { sendSlackAlert } from "@/lib/alerts/slack";
 import {
@@ -32,23 +33,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid api_key" }, { status: 401 });
   }
 
-  // Rate limiting — per api_key sliding window (fail open when Redis not configured)
-  if (ratelimit) {
-    const { success, limit, remaining, reset } = await ratelimit.limit(apiKey);
-    if (!success) {
-      logger.warn("[ingest] Rate limit exceeded", { orgId: org.id, limit, reset });
-      return NextResponse.json(
-        { error: "Rate limit exceeded" },
-        {
-          status: 429,
-          headers: {
-            "X-RateLimit-Limit": String(limit),
-            "X-RateLimit-Remaining": String(remaining),
-            "X-RateLimit-Reset": String(reset),
-          },
-        }
-      );
-    }
+  // Rate limiting — per api_key sliding window (always enforced; Redis upgrades to distributed)
+  const { success, limit, remaining, reset } = await checkRateLimit(apiKey);
+  if (!success) {
+    logger.warn("[ingest] Rate limit exceeded", { orgId: org.id, limit, reset });
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      {
+        status: 429,
+        headers: {
+          "X-RateLimit-Limit": String(limit),
+          "X-RateLimit-Remaining": String(remaining),
+          "X-RateLimit-Reset": String(reset),
+        },
+      }
+    );
   }
 
   let body: unknown;
@@ -177,6 +176,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ status: "ok", session_id: session.id });
   } catch (err) {
     logger.exception("[ingest] Unhandled error", err, { orgId });
+    reportError({
+      route: "/api/ingest",
+      message: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+      org_id: orgId,
+    });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

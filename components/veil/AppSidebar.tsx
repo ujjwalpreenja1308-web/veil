@@ -11,6 +11,7 @@ import {
   Settings,
   TrendingUp,
   Wrench,
+  ShieldAlert,
 } from "lucide-react";
 import {
   Sidebar,
@@ -34,6 +35,7 @@ const navItems = [
   { title: "Patterns", href: "/dashboard/patterns", icon: TrendingUp },
   { title: "Fixes", href: "/dashboard/fixes", icon: Wrench },
   { title: "Cost", href: "/dashboard/cost", icon: DollarSign },
+  { title: "Errors", href: "/dashboard/errors", icon: ShieldAlert },
   { title: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
