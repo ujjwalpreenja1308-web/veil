@@ -318,3 +318,237 @@ export async function getCostByDay(orgId: string, days: number): Promise<CostByD
 
   return Object.entries(grouped).map(([date, v]) => ({ date, ...v }));
 }
+
+// ─── Classification Updates ───────────────────────────────────────────────────
+
+export async function updateClassification(
+  classificationId: string,
+  updates: {
+    notes?: string | null;
+    suggestion_applied?: boolean;
+    suggestion_applied_at?: string | null;
+  }
+): Promise<void> {
+  const { error } = await supabase
+    .from("classifications")
+    .update(updates)
+    .eq("id", classificationId);
+  if (error) throw error;
+}
+
+// ─── Failure Patterns ─────────────────────────────────────────────────────────
+
+export interface FailurePattern {
+  agentId: string;
+  agentName: string;
+  category: string;
+  count: number;
+  subcategories: { subcategory: string; count: number }[];
+  firstSeen: string;
+  lastSeen: string;
+  severity: "low" | "medium" | "high" | "critical";
+}
+
+export async function getFailurePatterns(
+  orgId: string,
+  windowDays = 7,
+  minCount = 5
+): Promise<FailurePattern[]> {
+  const since = new Date();
+  since.setDate(since.getDate() - windowDays);
+
+  // Fetch classifications in window joined to sessions and agents
+  const { data, error } = await supabase
+    .from("classifications")
+    .select(`
+      id,
+      category,
+      subcategory,
+      severity,
+      created_at,
+      session:sessions!inner(id, org_id, agent_id, agent:agents!inner(id, name))
+    `)
+    .eq("session.org_id", orgId)
+    .gte("created_at", since.toISOString())
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  // Group by (agent_id, category)
+  const groups = new Map<
+    string,
+    {
+      agentId: string;
+      agentName: string;
+      category: string;
+      severity: string;
+      rows: { subcategory: string; created_at: string }[];
+    }
+  >();
+
+  for (const row of data ?? []) {
+    const s = row.session as unknown as {
+      org_id: string;
+      agent_id: string;
+      agent: { id: string; name: string };
+    };
+    const key = `${s.agent_id}::${row.category}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        agentId: s.agent_id,
+        agentName: s.agent.name,
+        category: row.category,
+        severity: row.severity,
+        rows: [],
+      });
+    }
+    groups.get(key)!.rows.push({ subcategory: row.subcategory, created_at: String(row.created_at) });
+  }
+
+  const patterns: FailurePattern[] = [];
+
+  for (const g of groups.values()) {
+    if (g.rows.length < minCount) continue;
+
+    // Count subcategories
+    const subCounts: Record<string, number> = {};
+    for (const r of g.rows) {
+      subCounts[r.subcategory] = (subCounts[r.subcategory] ?? 0) + 1;
+    }
+    const subcategories = Object.entries(subCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([subcategory, count]) => ({ subcategory, count }));
+
+    const timestamps = g.rows.map((r) => r.created_at).sort();
+
+    patterns.push({
+      agentId: g.agentId,
+      agentName: g.agentName,
+      category: g.category,
+      count: g.rows.length,
+      subcategories,
+      firstSeen: timestamps[0],
+      lastSeen: timestamps[timestamps.length - 1],
+      severity: g.severity as FailurePattern["severity"],
+    });
+  }
+
+  return patterns.sort((a, b) => b.count - a.count);
+}
+
+// ─── Fixes ────────────────────────────────────────────────────────────────────
+
+import type { Fix } from "./schema";
+
+export async function createFix(
+  orgId: string,
+  params: {
+    agent_id?: string;
+    category: string;
+    description: string;
+    applied_at?: string;
+    created_by_user_id?: string;
+  }
+): Promise<Fix> {
+  const { data, error } = await supabase
+    .from("fixes")
+    .insert({ org_id: orgId, ...params })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Fix;
+}
+
+export async function getFixesByOrg(orgId: string): Promise<Fix[]> {
+  const { data, error } = await supabase
+    .from("fixes")
+    .select("*")
+    .eq("org_id", orgId)
+    .order("applied_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as Fix[];
+}
+
+export async function deleteFix(orgId: string, fixId: string): Promise<void> {
+  const { error } = await supabase
+    .from("fixes")
+    .delete()
+    .eq("org_id", orgId)
+    .eq("id", fixId);
+  if (error) throw error;
+}
+
+export interface FixImpact {
+  fix: Fix;
+  category: string;
+  beforeCount: number;
+  afterCount: number;
+  beforeDays: number;
+  afterDays: number;
+  deltaPercent: number | null;
+}
+
+export async function getFixImpact(orgId: string, fixId: string): Promise<FixImpact | null> {
+  // Get the fix
+  const { data: fixData, error: fixErr } = await supabase
+    .from("fixes")
+    .select("*")
+    .eq("org_id", orgId)
+    .eq("id", fixId)
+    .single();
+  if (fixErr || !fixData) return null;
+
+  const fix = fixData as Fix;
+  const appliedAt = new Date(fix.applied_at);
+  const windowMs = 14 * 24 * 60 * 60 * 1000; // 14-day comparison window
+  const beforeStart = new Date(appliedAt.getTime() - windowMs).toISOString();
+  const afterEnd = new Date().toISOString();
+
+  // Count failures before fix
+  const beforeQuery = supabase
+    .from("classifications")
+    .select("id, session:sessions!inner(org_id, agent_id)", { count: "exact", head: true })
+    .eq("session.org_id", orgId)
+    .eq("category", fix.category)
+    .gte("created_at", beforeStart)
+    .lt("created_at", fix.applied_at.toISOString());
+
+  if (fix.agent_id) beforeQuery.eq("session.agent_id", fix.agent_id);
+
+  const afterQuery = supabase
+    .from("classifications")
+    .select("id, session:sessions!inner(org_id, agent_id)", { count: "exact", head: true })
+    .eq("session.org_id", orgId)
+    .eq("category", fix.category)
+    .gte("created_at", fix.applied_at.toISOString())
+    .lte("created_at", afterEnd);
+
+  if (fix.agent_id) afterQuery.eq("session.agent_id", fix.agent_id);
+
+  const [beforeRes, afterRes] = await Promise.all([beforeQuery, afterQuery]);
+
+  const beforeCount = beforeRes.count ?? 0;
+  const afterCount = afterRes.count ?? 0;
+  const afterDays = Math.max(
+    1,
+    Math.round((Date.now() - appliedAt.getTime()) / (1000 * 60 * 60 * 24))
+  );
+
+  // Normalise counts to "per day" before computing delta
+  const beforePerDay = beforeCount / 14;
+  const afterPerDay = afterCount / afterDays;
+  const deltaPercent =
+    beforePerDay > 0
+      ? Math.round(((afterPerDay - beforePerDay) / beforePerDay) * 100)
+      : null;
+
+  return {
+    fix,
+    category: fix.category,
+    beforeCount,
+    afterCount,
+    beforeDays: 14,
+    afterDays,
+    deltaPercent,
+  };
+}

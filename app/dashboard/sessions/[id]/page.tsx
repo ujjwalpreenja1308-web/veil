@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SessionTimeline } from "@/components/veil/SessionTimeline";
 import { AlertCard } from "@/components/veil/AlertCard";
+import { SuggestionCard } from "@/components/veil/SuggestionCard";
 import { ArrowLeft } from "lucide-react";
 import { useSession } from "@/hooks/use-sessions";
 import { formatDistanceToNow, format } from "date-fns";
@@ -84,18 +85,20 @@ export default function SessionDetailPage({ params }: { params: { id: string } }
         ))}
       </div>
 
-      {/* Classifications */}
+      {/* Classifications + Suggestions */}
       {classifications.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-lg font-semibold">Failures Detected</h2>
           {classifications.map((c) => (
-            <AlertCard
-              key={c.id}
-              classification={{
-                ...c,
-                session: { id: session.id, startedAt: session.startedAt },
-              }}
-            />
+            <div key={c.id} className="space-y-2">
+              <AlertCard
+                classification={{
+                  ...c,
+                  session: { id: session.id, startedAt: session.startedAt },
+                }}
+              />
+              <SuggestionCard classification={c} sessionId={session.id} />
+            </div>
           ))}
         </div>
       )}

@@ -9,6 +9,8 @@ import {
   Bell,
   DollarSign,
   Settings,
+  TrendingUp,
+  Wrench,
 } from "lucide-react";
 import {
   Sidebar,
@@ -29,6 +31,8 @@ const navItems = [
   { title: "Agents", href: "/dashboard/agents", icon: Bot },
   { title: "Sessions", href: "/dashboard/sessions", icon: ScrollText },
   { title: "Alerts", href: "/dashboard/alerts", icon: Bell },
+  { title: "Patterns", href: "/dashboard/patterns", icon: TrendingUp },
+  { title: "Fixes", href: "/dashboard/fixes", icon: Wrench },
   { title: "Cost", href: "/dashboard/cost", icon: DollarSign },
   { title: "Settings", href: "/dashboard/settings", icon: Settings },
 ];

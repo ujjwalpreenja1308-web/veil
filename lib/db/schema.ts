@@ -44,4 +44,19 @@ export interface Classification {
   subcategory: string;
   severity: "low" | "medium" | "high" | "critical";
   reason: string;
+  created_at: Date;
+  notes: string | null;
+  suggestion_applied: boolean;
+  suggestion_applied_at: Date | null;
+}
+
+export interface Fix {
+  id: string;
+  org_id: string;
+  agent_id: string | null;
+  category: string;
+  description: string;
+  applied_at: Date;
+  created_by_user_id: string | null;
+  created_at: Date;
 }
