@@ -57,6 +57,11 @@ Silent failure — classify these first.
 import veil
 veil.init(api_key="vl_xxx")   ← this is it
 
+## Frontend Tooling
+- Always use shadcn MCP for adding/modifying UI components:
+  `npx shadcn@latest mcp init --client claude`
+  This gives Claude direct access to the shadcn registry.
+
 ## What NOT To Do
 - Never make sync HTTP calls in SDK hot path
 - Never store raw OpenLIT data without normalizing
