@@ -1,6 +1,8 @@
 // Slack alerts via Composio — fires after a failure is classified
 // Always async/fire-and-forget — never blocks the ingest response
 import { logger } from "@/lib/logger";
+import { withRetry, withTimeout } from "@/lib/api-handler";
+import { isOpen, recordSuccess, recordFailure } from "@/lib/alerts/circuit-breaker";
 import type { Organization } from "@/lib/db/schema";
 import type { ClassificationResult } from "@/lib/rules/engine";
 
@@ -11,8 +13,10 @@ const SEVERITY_EMOJI: Record<string, string> = {
   low:      "🔵",
 };
 
+const CIRCUIT_KEY = "slack";
+
 // No # prefix — Composio strips it but docs say don't include it
-const SLACK_CHANNEL = "viell-alerts";
+const SLACK_CHANNEL = process.env.SLACK_ALERT_CHANNEL ?? "viell-alerts";
 
 export async function sendSlackAlert(params: {
   org: Organization;
@@ -23,7 +27,15 @@ export async function sendSlackAlert(params: {
 
   const composioApiKey = process.env.COMPOSIO_API_KEY;
   if (!composioApiKey) {
-    logger.warn("[alerts/slack] COMPOSIO_API_KEY not set — skipping Slack alert", {
+    logger.warn("[alerts/slack] COMPOSIO_API_KEY not set — Slack alerts disabled", {
+      orgId: org.id,
+      sessionId,
+    });
+    return;
+  }
+
+  if (isOpen(CIRCUIT_KEY)) {
+    logger.warn("[alerts/slack] Circuit breaker open — skipping Slack alert", {
       orgId: org.id,
       sessionId,
       category: result.category,
@@ -36,7 +48,6 @@ export async function sendSlackAlert(params: {
   const emoji = SEVERITY_EMOJI[result.severity] ?? "⚪";
   const category = result.category.replace(/_/g, " ");
 
-  // markdown_text is the preferred field — renders nicely in Slack
   const markdownText = [
     `${emoji} **Veil Alert — ${result.severity.toUpperCase()}**`,
     `**Category:** ${category}`,
@@ -44,20 +55,28 @@ export async function sendSlackAlert(params: {
     `[View Session →](${sessionUrl})`,
   ].join("\n");
 
+  const entityId = org.id;
+
   try {
-    const { Composio } = await import("composio-core");
-    const client = new Composio({ apiKey: composioApiKey });
+    await withRetry(
+      () =>
+        withTimeout(
+          async () => {
+            const { Composio } = await import("composio-core");
+            const client = new Composio({ apiKey: composioApiKey });
+            const entity = client.getEntity(entityId);
+            return entity.execute({
+              actionName: "SLACKBOT_SEND_MESSAGE",
+              params: { channel: SLACK_CHANNEL, markdown_text: markdownText },
+            });
+          },
+          10_000,
+          "Slack alert"
+        ),
+      { attempts: 3, baseDelayMs: 500, label: "sendSlackAlert" }
+    );
 
-    await client.actions.execute({
-      actionName: "SLACK_SEND_MESSAGE",
-      requestBody: {
-        input: {
-          channel: SLACK_CHANNEL,
-          markdown_text: markdownText,
-        },
-      },
-    });
-
+    recordSuccess(CIRCUIT_KEY);
     logger.info("[alerts/slack] Alert sent", {
       orgId: org.id,
       sessionId,
@@ -66,10 +85,12 @@ export async function sendSlackAlert(params: {
       channel: SLACK_CHANNEL,
     });
   } catch (err) {
-    logger.exception("[alerts/slack] Failed to send Slack alert via Composio", err, {
+    recordFailure(CIRCUIT_KEY);
+    logger.exception("[alerts/slack] Failed to send Slack alert after retries", err, {
       orgId: org.id,
       sessionId,
       category: result.category,
+      entityId,
     });
   }
 }

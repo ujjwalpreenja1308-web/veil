@@ -1,5 +1,6 @@
 // All database queries — every query MUST include org_id for tenant isolation
 import { supabase } from "@/lib/supabase";
+import { logger } from "@/lib/logger";
 import type { Agent, Session, Event, Classification, Organization } from "./schema";
 
 // ─── Organizations ────────────────────────────────────────────────────────────
@@ -10,7 +11,13 @@ export async function getOrgByApiKey(apiKey: string): Promise<Organization | nul
     .select("*")
     .eq("api_key", apiKey)
     .single();
-  if (error) return null;
+  // PGRST116 = "not found" — anything else is a real DB error
+  if (error) {
+    if (error.code !== "PGRST116") {
+      logger.exception("[db] getOrgByApiKey DB error", error, { key: apiKey.slice(0, 8) + "..." });
+    }
+    return null;
+  }
   return data as Organization;
 }
 
@@ -213,8 +220,15 @@ export async function getOverviewStats(orgId: string): Promise<OverviewStats> {
 
   const [agentsRes, sessionsTodayRes] = await Promise.all([
     supabase.from("agents").select("id", { count: "exact", head: true }).eq("org_id", orgId),
-    supabase.from("sessions").select("*").eq("org_id", orgId).gte("started_at", todayISO),
+    supabase.from("sessions").select("status, cost").eq("org_id", orgId).gte("started_at", todayISO),
   ]);
+
+  if (agentsRes.error) {
+    logger.exception("[db] getOverviewStats agents query failed", agentsRes.error, { orgId });
+  }
+  if (sessionsTodayRes.error) {
+    logger.exception("[db] getOverviewStats sessions query failed", sessionsTodayRes.error, { orgId });
+  }
 
   const totalAgents = agentsRes.count ?? 0;
   const sessionsToday = sessionsTodayRes.data ?? [];
@@ -245,21 +259,34 @@ export interface AgentWithHealth extends Agent {
 }
 
 export async function getAgentsWithHealth(orgId: string): Promise<AgentWithHealth[]> {
-  const [agents, sessions] = await Promise.all([
-    getAgentsByOrg(orgId),
-    getSessionsByOrg(orgId, 1000),
-  ]);
+  // Single query: agents + per-agent aggregates computed in the DB, not in memory
+  const { data, error } = await supabase
+    .from("agents")
+    .select(`
+      *,
+      sessions!sessions_agent_id_fkey(status, started_at)
+    `)
+    .eq("org_id", orgId)
+    .order("created_at", { ascending: false });
 
-  return agents.map((agent) => {
-    const agentSessions = sessions.filter((s) => s.agent_id === agent.id);
-    const lastSession = agentSessions[0];
-    return {
-      ...agent,
-      last_session_status: lastSession?.status ?? null,
-      session_count: agentSessions.length,
-      failure_count: agentSessions.filter((s) => s.status === "failed").length,
-    };
-  });
+  if (error) throw error;
+
+  return ((data ?? []) as (Agent & { sessions: { status: string; started_at: string }[] })[]).map(
+    (agent) => {
+      const sorted = [...agent.sessions].sort(
+        (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
+      );
+      return {
+        id: agent.id,
+        org_id: agent.org_id,
+        name: agent.name,
+        created_at: agent.created_at,
+        last_session_status: (sorted[0]?.status ?? null) as AgentWithHealth["last_session_status"],
+        session_count: sorted.length,
+        failure_count: sorted.filter((s) => s.status === "failed").length,
+      };
+    }
+  );
 }
 
 export interface CostByDay {

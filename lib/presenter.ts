@@ -123,6 +123,8 @@ export function shouldShowEvent(type: string): boolean {
   if (t === "post" || t === "get" || t === "http" || t.startsWith("http.")) return false;
   // Hide internal opentelemetry spans
   if (t.startsWith("otlp") || t.startsWith("otel")) return false;
+  // Hide session lifecycle markers — not meaningful in event timeline
+  if (t === "session.end" || t === "session.start") return false;
   return true;
 }
 
