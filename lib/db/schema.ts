@@ -4,6 +4,7 @@ export interface Organization {
   id: string;
   name: string;
   api_key: string;
+  clerk_user_id: string | null;
   created_at: Date;
 }
 

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:docs.coderabbit.ai)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(netstat -ano)",
+      "Bash(taskkill /PID 18008 /F)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)",
+      "Bash(ls /d/Veil.dev/app/api/agents/[id])",
+      "Bash(npm install:*)",
+      "mcp__f3a25e5c-7d98-4424-bcc5-7571ba1845c6__apply_migration"
+    ]
+  }
+}
