@@ -22,6 +22,7 @@ export function FixImpactCard({ fix }: FixImpactCardProps) {
 
   const delta = impact?.deltaPercent ?? null;
   const hasData = impact && (impact.beforeCount > 0 || impact.afterCount > 0);
+  const isTooRecent = impact && impact.afterDays < 1;
 
   function handleDelete() {
     if (!confirming) { setConfirming(true); return; }
@@ -83,7 +84,11 @@ export function FixImpactCard({ fix }: FixImpactCardProps) {
           </span>
         </div>
 
-        {hasData ? (
+        {isTooRecent ? (
+          <p className="text-xs text-muted-foreground">
+            Fix applied less than a day ago. Check back tomorrow to see impact data.
+          </p>
+        ) : hasData ? (
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-md bg-muted/50 p-3 text-center">
               <p className="text-xs text-muted-foreground mb-1">Before fix</p>

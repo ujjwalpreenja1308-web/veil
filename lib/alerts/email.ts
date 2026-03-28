@@ -1,5 +1,6 @@
-// Email alerts via Composio — fires after a failure is classified
+// Email alerts via Resend — fires after a failure is classified
 // Always async/fire-and-forget — never blocks the ingest response
+import { Resend } from "resend";
 import { logger } from "@/lib/logger";
 import { clerkClient } from "@clerk/nextjs/server";
 import { withRetry, withTimeout } from "@/lib/api-handler";
@@ -75,6 +76,7 @@ function buildEmailHtml(params: {
 
   <p style="margin-top:32px;font-size:12px;color:#9ca3af">
     You are receiving this because you are the owner of a Veil organization.
+    <br/>Sent by <a href="${appUrl}" style="color:#9ca3af">Veil</a>.
   </p>
 </body>
 </html>`.trim();
@@ -87,9 +89,9 @@ export async function sendFailureAlert(params: {
 }): Promise<void> {
   const { org, sessionId, result } = params;
 
-  const composioApiKey = process.env.COMPOSIO_API_KEY;
-  if (!composioApiKey) {
-    logger.warn("[alerts/email] COMPOSIO_API_KEY not set — email alerts disabled", {
+  const resendApiKey = process.env.RESEND_API_KEY;
+  if (!resendApiKey) {
+    logger.warn("[alerts/email] RESEND_API_KEY not set — email alerts disabled", {
       orgId: org.id,
       sessionId,
     });
@@ -105,25 +107,22 @@ export async function sendFailureAlert(params: {
     return;
   }
 
-  // Get user email from Clerk with a reasonable timeout
+  // Resolve user email from Clerk
   let toEmail: string | undefined;
   try {
     if (!org.clerk_user_id) {
       logger.warn("[alerts/email] Org has no clerk_user_id — cannot resolve email", { orgId: org.id });
       return;
     }
-    const user = await withTimeout(
-      async () => {
-        const clerk = await clerkClient();
-        return clerk.users.getUser(org.clerk_user_id!);
-      },
-      5_000,
-      "Clerk user lookup"
-    );
+    const user = await withTimeout(async () => {
+      const clerk = await clerkClient();
+      return clerk.users.getUser(org.clerk_user_id!);
+    }, 5_000, "Clerk user lookup");
+
     const primary = user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId);
     toEmail = primary?.emailAddress;
     if (!toEmail) {
-      logger.warn("[alerts/email] Could not resolve primary email for user", {
+      logger.warn("[alerts/email] Could not resolve primary email", {
         orgId: org.id,
         clerkUserId: org.clerk_user_id,
       });
@@ -138,31 +137,32 @@ export async function sendFailureAlert(params: {
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://veil.dev";
-  const subject = `[Veil Alert] ${result.category.replace(/_/g, " ")} detected — ${result.severity}`;
-  const htmlBody = buildEmailHtml({ sessionId, result, appUrl });
+  const fromAddress = process.env.RESEND_FROM_ADDRESS ?? "alerts@veil.dev";
+  const subject = `[Veil] ${result.category.replace(/_/g, " ")} detected — ${result.severity}`;
+  const html = buildEmailHtml({ sessionId, result, appUrl });
 
   try {
     await withRetry(
       () =>
         withTimeout(
           async () => {
-            const { Composio } = await import("composio-core");
-            const client = new Composio({ apiKey: composioApiKey });
-            return client.actions.execute({
-              actionName: "GMAIL_SEND_EMAIL",
-              requestBody: {
-                input: { recipient_email: toEmail!, subject, body: htmlBody },
-              },
+            const resend = new Resend(resendApiKey);
+            const { error } = await resend.emails.send({
+              from: `Veil Alerts <${fromAddress}>`,
+              to: [toEmail!],
+              subject,
+              html,
             });
+            if (error) throw new Error(error.message);
           },
           10_000,
-          "email alert"
+          "Resend email"
         ),
       { attempts: 3, baseDelayMs: 500, label: "sendFailureAlert" }
     );
 
     recordSuccess(CIRCUIT_KEY);
-    logger.info("[alerts/email] Alert sent", {
+    logger.info("[alerts/email] Alert sent via Resend", {
       orgId: org.id,
       sessionId,
       category: result.category,
@@ -171,7 +171,7 @@ export async function sendFailureAlert(params: {
     });
   } catch (err) {
     recordFailure(CIRCUIT_KEY);
-    logger.exception("[alerts/email] Failed to send email alert after retries", err, {
+    logger.exception("[alerts/email] Failed to send email after retries", err, {
       orgId: org.id,
       sessionId,
       category: result.category,

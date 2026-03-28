@@ -242,12 +242,13 @@ export interface ClassificationWithSession extends Classification {
   session: Pick<Session, "id" | "org_id" | "agent_id" | "started_at" | "failure_type" | "status">;
 }
 
-export async function getClassificationsByOrg(orgId: string): Promise<ClassificationWithSession[]> {
+export async function getClassificationsByOrg(orgId: string, limit = 100): Promise<ClassificationWithSession[]> {
   const { data, error } = await supabase
     .from("classifications")
     .select("*, session:sessions!inner(id, org_id, agent_id, started_at, failure_type, status)")
     .eq("session.org_id", orgId)
-    .order("session(started_at)", { ascending: false });
+    .order("session(started_at)", { ascending: false })
+    .limit(limit);
   if (error) throw error;
   return (data ?? []) as unknown as ClassificationWithSession[];
 }

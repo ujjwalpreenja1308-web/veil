@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FailureTypeTag } from "@/components/veil/FailureTypeTag";
-import { ScrollText } from "lucide-react";
+import { ScrollText, Loader2 } from "lucide-react";
 import { useSessions, usePrefetchSession } from "@/hooks/use-sessions";
 import { formatDistanceToNow } from "date-fns";
 
@@ -16,7 +17,7 @@ const statusBadge: Record<string, { label: string; variant: "default" | "seconda
 };
 
 export default function SessionsPage() {
-  const { data: sessions, isLoading } = useSessions();
+  const { data: sessions, isLoading, isFetching, hasMore, loadMore } = useSessions();
   const prefetchSession = usePrefetchSession();
 
   return (
@@ -80,6 +81,14 @@ export default function SessionsPage() {
               </Link>
             );
           })}
+          {hasMore && (
+            <div className="flex justify-center pt-2">
+              <Button variant="outline" size="sm" onClick={loadMore} disabled={isFetching}>
+                {isFetching ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Load more
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>

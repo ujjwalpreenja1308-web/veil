@@ -13,6 +13,8 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { LiveBadge } from "@/components/veil/LiveBadge";
 import { PatternCard } from "@/components/veil/PatternCard";
+import { OnboardingBanner } from "@/components/veil/OnboardingBanner";
+import { useSlackConnection } from "@/hooks/use-slack-connection";
 import type { HealthStatus } from "@/components/veil/HealthIndicator";
 
 const healthFromStatus = (status: string | null): HealthStatus => {
@@ -37,6 +39,7 @@ export default function DashboardPage() {
   const { data: stats, isLoading: statsLoading, isFetching: statsFetching } = useOverviewStats();
   const { data: agents, isLoading: agentsLoading, isFetching: agentsFetching } = useAgents();
   const { data: patterns } = usePatterns(7);
+  const { data: slackData } = useSlackConnection();
   const prefetchAgent = usePrefetchAgent();
 
   // Show provisioning screen only on first load (no cached data yet)
@@ -68,6 +71,13 @@ export default function DashboardPage() {
         </div>
         <LiveBadge isFetching={statsFetching || agentsFetching} />
       </div>
+
+      {/* Onboarding */}
+      <OnboardingBanner
+        hasAgents={!!agents?.length}
+        hasSessions={!!stats?.sessionsToday || false}
+        slackConnected={slackData?.connected ?? false}
+      />
 
       {/* Stat Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Lightbulb, Copy, CheckCheck, Check } from "lucide-react";
+import { Lightbulb, Copy, CheckCheck, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useUpdateClassification } from "@/hooks/use-classifications";
 import { getSuggestion } from "@/lib/suggestions/templates";
@@ -85,7 +85,11 @@ export function SuggestionCard({ classification, sessionId }: SuggestionCardProp
               disabled={update.isPending}
               className="gap-1.5 border-green-500/50 text-green-500 hover:bg-green-500/10"
             >
-              <Check className="h-3.5 w-3.5" />
+              {update.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Check className="h-3.5 w-3.5" />
+              )}
               Mark as applied
             </Button>
           </div>
