@@ -1,5 +1,6 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/veil/AppSidebar";
+import { ErrorBoundary } from "@/components/veil/ErrorBoundary";
 
 export default function DashboardLayout({
   children,
@@ -15,7 +16,9 @@ export default function DashboardLayout({
             <SidebarTrigger />
             <span className="text-sm font-semibold text-primary">Veil</span>
           </div>
-          <div className="p-6">{children}</div>
+          <div className="p-6">
+            <ErrorBoundary>{children}</ErrorBoundary>
+          </div>
         </main>
       </div>
     </SidebarProvider>

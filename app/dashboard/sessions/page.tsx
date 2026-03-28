@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FailureTypeTag } from "@/components/veil/FailureTypeTag";
 import { ScrollText } from "lucide-react";
-import { useSessions } from "@/hooks/use-sessions";
+import { useSessions, usePrefetchSession } from "@/hooks/use-sessions";
 import { formatDistanceToNow } from "date-fns";
 
 const statusBadge: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -17,6 +17,7 @@ const statusBadge: Record<string, { label: string; variant: "default" | "seconda
 
 export default function SessionsPage() {
   const { data: sessions, isLoading } = useSessions();
+  const prefetchSession = usePrefetchSession();
 
   return (
     <div className="space-y-6">
@@ -50,12 +51,19 @@ export default function SessionsPage() {
           {sessions.map((session) => {
             const sb = statusBadge[session.status] ?? statusBadge.running;
             return (
-              <Link key={session.id} href={`/dashboard/sessions/${session.id}`}>
-                <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+              <Link key={session.id} href={`/dashboard/sessions/${session.id}`} className="block">
+                <Card
+                  tabIndex={-1}
+                  className="hover:bg-muted/50 transition-colors cursor-pointer"
+                  onMouseEnter={() => prefetchSession(session.id)}
+                >
                   <CardContent className="flex items-center gap-4 py-4">
-                    <code className="text-xs text-muted-foreground font-mono">
-                      {session.id.slice(0, 8)}
-                    </code>
+                    <div className="min-w-0">
+                      {session.agentName && (
+                        <p className="text-xs text-muted-foreground truncate">{session.agentName}</p>
+                      )}
+                      <code className="text-xs font-mono">{session.id.slice(0, 8)}</code>
+                    </div>
                     <Badge variant={sb.variant}>{sb.label}</Badge>
                     {session.failureType && (
                       <FailureTypeTag category={session.failureType} />

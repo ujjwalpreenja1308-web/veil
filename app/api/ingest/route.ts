@@ -4,6 +4,7 @@ import { classify } from "@/lib/rules/engine";
 import { logger } from "@/lib/logger";
 import { ratelimit } from "@/lib/ratelimit";
 import { sendFailureAlert } from "@/lib/alerts/email";
+import { sendSlackAlert } from "@/lib/alerts/slack";
 import {
   getOrgByApiKey,
   upsertAgent,
@@ -157,8 +158,9 @@ export async function POST(req: NextRequest) {
             category: result.category,
             severity: result.severity,
           });
-          // Fire-and-forget alert — never block the ingest response
+          // Fire-and-forget alerts — never block the ingest response
           void sendFailureAlert({ org, sessionId: session.id, result });
+          void sendSlackAlert({ org, sessionId: session.id, result });
         } catch (err) {
           logger.exception("[ingest] Failed to insert classification", err, {
             orgId,

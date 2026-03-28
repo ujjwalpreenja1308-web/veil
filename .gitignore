@@ -34,3 +34,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+scripts/test_e2e.py
+scripts/seed-test-org.ts
+scripts/test_failing_agent.py

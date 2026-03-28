@@ -2,14 +2,17 @@
 import { clerkClient } from "@clerk/nextjs/server";
 import { supabase } from "@/lib/supabase";
 import { logger } from "@/lib/logger";
+import { withTimeout } from "@/lib/api-handler";
 import type { Organization } from "./schema";
 
 export async function getOrgByClerkUser(userId: string): Promise<Organization | null> {
   let orgId: string | undefined;
 
   try {
-    const clerk = await clerkClient();
-    const user = await clerk.users.getUser(userId);
+    const user = await withTimeout(async () => {
+      const clerk = await clerkClient();
+      return clerk.users.getUser(userId);
+    }, 5_000, "Clerk getUser");
     orgId = user.publicMetadata?.org_id as string | undefined;
   } catch (err) {
     logger.exception("Failed to fetch Clerk user", err, { userId });

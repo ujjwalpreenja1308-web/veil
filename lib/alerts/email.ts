@@ -2,6 +2,8 @@
 // Always async/fire-and-forget — never blocks the ingest response
 import { logger } from "@/lib/logger";
 import { clerkClient } from "@clerk/nextjs/server";
+import { withRetry, withTimeout } from "@/lib/api-handler";
+import { isOpen, recordSuccess, recordFailure } from "@/lib/alerts/circuit-breaker";
 import type { Organization } from "@/lib/db/schema";
 import type { ClassificationResult } from "@/lib/rules/engine";
 
@@ -11,6 +13,8 @@ const SEVERITY_COLOR: Record<string, string> = {
   medium:   "#eab308",
   low:      "#3b82f6",
 };
+
+const CIRCUIT_KEY = "email";
 
 function buildEmailHtml(params: {
   sessionId: string;
@@ -85,7 +89,15 @@ export async function sendFailureAlert(params: {
 
   const composioApiKey = process.env.COMPOSIO_API_KEY;
   if (!composioApiKey) {
-    logger.warn("[alerts/email] COMPOSIO_API_KEY not set — skipping alert", {
+    logger.warn("[alerts/email] COMPOSIO_API_KEY not set — email alerts disabled", {
+      orgId: org.id,
+      sessionId,
+    });
+    return;
+  }
+
+  if (isOpen(CIRCUIT_KEY)) {
+    logger.warn("[alerts/email] Circuit breaker open — skipping email alert", {
       orgId: org.id,
       sessionId,
       category: result.category,
@@ -93,15 +105,21 @@ export async function sendFailureAlert(params: {
     return;
   }
 
-  // Get user email from Clerk
+  // Get user email from Clerk with a reasonable timeout
   let toEmail: string | undefined;
   try {
     if (!org.clerk_user_id) {
       logger.warn("[alerts/email] Org has no clerk_user_id — cannot resolve email", { orgId: org.id });
       return;
     }
-    const clerk = await clerkClient();
-    const user = await clerk.users.getUser(org.clerk_user_id);
+    const user = await withTimeout(
+      async () => {
+        const clerk = await clerkClient();
+        return clerk.users.getUser(org.clerk_user_id!);
+      },
+      5_000,
+      "Clerk user lookup"
+    );
     const primary = user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId);
     toEmail = primary?.emailAddress;
     if (!toEmail) {
@@ -124,21 +142,26 @@ export async function sendFailureAlert(params: {
   const htmlBody = buildEmailHtml({ sessionId, result, appUrl });
 
   try {
-    // Dynamic import — keeps composio-core out of the critical ingest path bundle
-    const { Composio } = await import("composio-core");
-    const client = new Composio({ apiKey: composioApiKey });
+    await withRetry(
+      () =>
+        withTimeout(
+          async () => {
+            const { Composio } = await import("composio-core");
+            const client = new Composio({ apiKey: composioApiKey });
+            return client.actions.execute({
+              actionName: "GMAIL_SEND_EMAIL",
+              requestBody: {
+                input: { recipient_email: toEmail!, subject, body: htmlBody },
+              },
+            });
+          },
+          10_000,
+          "email alert"
+        ),
+      { attempts: 3, baseDelayMs: 500, label: "sendFailureAlert" }
+    );
 
-    await client.actions.execute({
-      actionName: "GMAIL_SEND_EMAIL",
-      requestBody: {
-        input: {
-          recipient_email: toEmail,
-          subject,
-          body: htmlBody,
-        },
-      },
-    });
-
+    recordSuccess(CIRCUIT_KEY);
     logger.info("[alerts/email] Alert sent", {
       orgId: org.id,
       sessionId,
@@ -147,7 +170,8 @@ export async function sendFailureAlert(params: {
       to: toEmail,
     });
   } catch (err) {
-    logger.exception("[alerts/email] Failed to send email via Composio", err, {
+    recordFailure(CIRCUIT_KEY);
+    logger.exception("[alerts/email] Failed to send email alert after retries", err, {
       orgId: org.id,
       sessionId,
       category: result.category,

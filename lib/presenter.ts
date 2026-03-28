@@ -45,6 +45,7 @@ export function presentEvent(e: Event): UIEvent {
 export interface UISession {
   id: string;
   agentId: string;
+  agentName: string | null;
   status: Session["status"];
   failureType: string | null;
   failureLabel: string | null;
@@ -54,17 +55,25 @@ export interface UISession {
   completedAt: string | null;
 }
 
-export function presentSession(s: Session): UISession {
+export function presentSession(s: Session & { agent?: { name?: string } | null }): UISession {
+  // Duration: prefer completed_at - started_at over stored duration_ms
+  let durationMs = s.duration_ms ?? 0;
+  if (s.completed_at && s.started_at) {
+    const computed = new Date(s.completed_at).getTime() - new Date(s.started_at).getTime();
+    if (computed > 0) durationMs = computed;
+  }
+
   return {
     id: s.id,
     agentId: s.agent_id,
+    agentName: s.agent?.name ?? null,
     status: s.status,
     failureType: s.failure_type ?? null,
     failureLabel: s.failure_type
       ? (FAILURE_CATEGORIES[s.failure_type as FailureCategory] ?? s.failure_type)
       : null,
     cost: Number(s.cost ?? 0),
-    durationMs: s.duration_ms ?? 0,
+    durationMs,
     startedAt: String(s.started_at),
     completedAt: s.completed_at ? String(s.completed_at) : null,
   };
@@ -105,6 +114,18 @@ function numOrNull(v: unknown): number | null {
   if (v == null) return null;
   const n = Number(v);
   return isNaN(n) ? null : n;
+}
+
+// Returns null for spans that should be hidden from the timeline (raw HTTP, internal spans)
+export function shouldShowEvent(type: string): boolean {
+  const t = type.toLowerCase();
+  // Hide raw HTTP spans that OpenLIT emits for its own transport
+  if (t === "post" || t === "get" || t === "http" || t.startsWith("http.")) return false;
+  // Hide internal opentelemetry spans
+  if (t.startsWith("otlp") || t.startsWith("otel")) return false;
+  // Hide session lifecycle markers — not meaningful in event timeline
+  if (t === "session.end" || t === "session.start") return false;
+  return true;
 }
 
 function labelEventType(type: string): string {
