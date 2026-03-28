@@ -48,8 +48,16 @@ export default function SessionDetailPage({ params }: { params: { id: string } }
         <Link href="/dashboard/sessions" className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" />
         </Link>
-        <h1 className="text-2xl font-bold tracking-tight font-mono">{session.id.slice(0, 8)}…</h1>
+        <div>
+          {session.agentName && (
+            <p className="text-sm text-muted-foreground">{session.agentName}</p>
+          )}
+          <h1 className="text-2xl font-bold tracking-tight font-mono">{session.id.slice(0, 8)}…</h1>
+        </div>
         <Badge variant={statusVariant[session.status] ?? "secondary"}>{session.status}</Badge>
+        {session.failureLabel && (
+          <Badge variant="destructive" className="text-xs">{session.failureLabel}</Badge>
+        )}
       </div>
 
       {/* Session Meta */}

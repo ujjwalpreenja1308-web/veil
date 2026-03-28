@@ -66,15 +66,15 @@ export async function upsertAgent(orgId: string, name: string): Promise<Agent> {
 
 // ─── Sessions ─────────────────────────────────────────────────────────────────
 
-export async function getSessionsByOrg(orgId: string, limit = 100): Promise<Session[]> {
+export async function getSessionsByOrg(orgId: string, limit = 100): Promise<(Session & { agent: { name: string } | null })[]> {
   const { data, error } = await supabase
     .from("sessions")
-    .select("*")
+    .select("*, agent:agents(name)")
     .eq("org_id", orgId)
     .order("started_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
-  return (data ?? []) as Session[];
+  return (data ?? []) as (Session & { agent: { name: string } | null })[];
 }
 
 export async function getSessionById(orgId: string, sessionId: string): Promise<Session | null> {

@@ -53,9 +53,12 @@ export default function SessionsPage() {
               <Link key={session.id} href={`/dashboard/sessions/${session.id}`}>
                 <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
                   <CardContent className="flex items-center gap-4 py-4">
-                    <code className="text-xs text-muted-foreground font-mono">
-                      {session.id.slice(0, 8)}
-                    </code>
+                    <div className="min-w-0">
+                      {session.agentName && (
+                        <p className="text-xs text-muted-foreground truncate">{session.agentName}</p>
+                      )}
+                      <code className="text-xs font-mono">{session.id.slice(0, 8)}</code>
+                    </div>
                     <Badge variant={sb.variant}>{sb.label}</Badge>
                     {session.failureType && (
                       <FailureTypeTag category={session.failureType} />

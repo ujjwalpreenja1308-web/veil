@@ -6,6 +6,7 @@ import { classify } from "@/lib/rules/engine";
 import { logger } from "@/lib/logger";
 import { ratelimit } from "@/lib/ratelimit";
 import { sendFailureAlert } from "@/lib/alerts/email";
+import { sendSlackAlert } from "@/lib/alerts/slack";
 import type { Organization } from "@/lib/db/schema";
 import {
   getOrgByApiKey,
@@ -237,8 +238,9 @@ async function closeSession(org: Organization, sessionId: string): Promise<void>
         severity: result.severity,
         reason: result.reason,
       });
-      // Fire-and-forget alert — never block the ingest response
+      // Fire-and-forget alerts — never block the ingest response
       void sendFailureAlert({ org, sessionId, result });
+      void sendSlackAlert({ org, sessionId, result });
     } catch (err) {
       logger.exception("[ingest/otlp] Failed to insert classification", err, { orgId, sessionId });
       throw err;
