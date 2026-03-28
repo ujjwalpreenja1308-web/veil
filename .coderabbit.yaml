@@ -1,45 +1,72 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 
+language: "en-US"
+tone_instructions: "Be concise and direct. Focus on correctness, security, and performance. This is a SaaS observability platform — flag any tenant isolation issues as critical."
+
 reviews:
+  profile: "assertive"
+  request_changes_workflow: true
+  high_level_summary: true
+  review_status: true
+  collapse_walkthrough: false
+  poem: false
+  sequence_diagrams: true
+  estimate_code_review_effort: true
+  related_issues: true
+  related_prs: true
   auto_review:
     enabled: true
     drafts: false
-  review_status: true
-  poem: false
-  collapse_walkthrough: false
+    base_branches:
+      - "main"
   path_filters:
-    - "!**/*.lock"
     - "!**/node_modules/**"
     - "!**/.next/**"
+    - "!**/package-lock.json"
+    - "!**/*.lock"
   path_instructions:
-    - path: "app/**"
-      instructions: |
-        This is a Next.js 14 App Router project.
-        - Ensure no API endpoints are unprotected except /health and /api/ingest
-        - Check that server components are not importing client-only code
-        - Verify all dashboard routes are wrapped in Clerk auth protection
     - path: "lib/db/**"
       instructions: |
-        Every database query MUST include org_id for tenant isolation.
-        Flag any query that does not scope by org_id as a critical issue.
+        CRITICAL: Every database query must include org_id for tenant isolation.
+        Flag any query function that does not have org_id as a parameter or does
+        not scope results by org_id as a critical security issue.
     - path: "lib/normalizer/**"
       instructions: |
         OpenLIT types must never leak outside this directory.
-        Flag any import of OpenLIT types from outside /lib/normalizer.
+        Flag any export of raw OpenLIT types or any import of OpenLIT
+        types from outside /lib/normalizer as a critical architectural violation.
     - path: "lib/sdk/**"
       instructions: |
-        SDK rules: never add more than 5ms latency, all telemetry must be
-        async/fire-and-forget, never block the agent execution thread,
-        never make sync HTTP calls in the hot path.
-    - path: "components/veil/**"
-      instructions: |
-        Veil-specific components. Ensure they use Veil design tokens
-        (veil-healthy, veil-warning, veil-critical, veil-unknown) for
-        status colors, not hardcoded hex/rgb values.
+        SDK performance rules — flag violations as critical:
+        1. No sync HTTP calls in the hot path (must be async/fire-and-forget)
+        2. No blocking the agent execution thread
+        3. Telemetry collection must add less than 5ms latency
+        4. No engineer-facing config beyond api_key
     - path: "middleware.ts"
       instructions: |
-        Verify public routes are ONLY / and /api/ingest.
-        Any other unprotected route is a security issue.
+        Security check: public routes must be ONLY "/" and "/api/ingest".
+        Any other unprotected route is a critical security issue.
+        Verify clerkMiddleware is correctly protecting all /dashboard routes.
+    - path: "app/api/**"
+      instructions: |
+        All API routes except /api/ingest must be protected by Clerk auth.
+        Check for org_id extraction from auth context in any data-fetching routes.
+    - path: "components/veil/**"
+      instructions: |
+        Use Veil design tokens for status colors (veil-healthy, veil-warning,
+        veil-critical, veil-unknown). Flag hardcoded hex/rgb/hsl color values
+        for status indicators.
+    - path: "app/**"
+      instructions: |
+        Next.js 14 App Router. Check:
+        - No "use client" on server components that don't need it
+        - No direct database calls from client components
+        - Correct use of async server components for data fetching
+  tools:
+    eslint:
+      enabled: true
+    biome:
+      enabled: false
 
 chat:
   auto_reply: true
