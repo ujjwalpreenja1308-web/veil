@@ -1,0 +1,45 @@
+version: "2"
+
+reviews:
+  auto_review:
+    enabled: true
+    drafts: false
+  review_status: true
+  poem: false
+  collapse_walkthrough: false
+  path_filters:
+    - "!**/*.lock"
+    - "!**/node_modules/**"
+    - "!**/.next/**"
+  path_instructions:
+    - path: "app/**"
+      instructions: |
+        This is a Next.js 14 App Router project.
+        - Ensure no API endpoints are unprotected except /health and /api/ingest
+        - Check that server components are not importing client-only code
+        - Verify all dashboard routes are wrapped in Clerk auth protection
+    - path: "lib/db/**"
+      instructions: |
+        Every database query MUST include org_id for tenant isolation.
+        Flag any query that does not scope by org_id as a critical issue.
+    - path: "lib/normalizer/**"
+      instructions: |
+        OpenLIT types must never leak outside this directory.
+        Flag any import of OpenLIT types from outside /lib/normalizer.
+    - path: "lib/sdk/**"
+      instructions: |
+        SDK rules: never add more than 5ms latency, all telemetry must be
+        async/fire-and-forget, never block the agent execution thread,
+        never make sync HTTP calls in the hot path.
+    - path: "components/veil/**"
+      instructions: |
+        Veil-specific components. Ensure they use Veil design tokens
+        (veil-healthy, veil-warning, veil-critical, veil-unknown) for
+        status colors, not hardcoded hex/rgb values.
+    - path: "middleware.ts"
+      instructions: |
+        Verify public routes are ONLY / and /api/ingest.
+        Any other unprotected route is a security issue.
+
+chat:
+  auto_reply: true
