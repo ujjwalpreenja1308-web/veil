@@ -7,14 +7,15 @@ name = "veil-sdk"
 version = "0.1.0"
 description = "Veil AI Agent Observability SDK — one-liner instrumentation for AI agents"
 readme = "README.md"
-license = "MIT"
+license = { file = "LICENSE" }
 requires-python = ">=3.9"
 authors = [{ name = "Veil", email = "eng@veil.dev" }]
-keywords = ["observability", "ai", "agents", "telemetry"]
+keywords = ["observability", "ai", "agents", "telemetry", "opentelemetry", "llm"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
@@ -33,6 +34,16 @@ dependencies = [
 Homepage = "https://veil.dev"
 Documentation = "https://docs.veil.dev"
 Repository = "https://github.com/veil-dev/veil-sdk-python"
+"Bug Tracker" = "https://github.com/veil-dev/veil-sdk-python/issues"
+Changelog = "https://github.com/veil-dev/veil-sdk-python/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/veil"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/LICENSE",
+    "/README.md",
+    "/CHANGELOG.md",
+]
