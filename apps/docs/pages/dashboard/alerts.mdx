@@ -1,0 +1,46 @@
+# Alerts
+
+Veil sends alerts when a failure is detected at the end of a session.
+
+## Alert channels
+
+### Slack
+
+Connect Slack from the Settings page. Once connected, invite the Veil bot to your channel with `/invite @Veil`. Veil sends a message whenever a session fails. The message includes:
+
+- Failure category and severity
+- A plain-language reason for the failure
+- A direct link to the session in the dashboard
+
+See [Slack integration](/integrations/slack) for setup instructions.
+
+### Email
+
+Veil sends email alerts to the address on your account for high and critical severity failures.
+
+## Alert content
+
+Every alert includes:
+
+- Which agent failed
+- What failure category was detected
+- The severity level
+- A link to the full session timeline in the dashboard
+
+## Alert conditions
+
+Alerts are sent when:
+
+- A session ends with a failure classification of any severity
+
+Low-severity failures (like minor latency spikes) still trigger alerts. Use the severity level in the message to triage quickly.
+
+## No alert spam
+
+Each session produces at most one alert. Veil does not send duplicate alerts for the same session.
+
+import { Callout } from "nextra/components";
+
+<Callout type="info">
+  Alerts are fire-and-forget. A failed Slack delivery or email bounce will not affect session ingestion or classification.
+</Callout>

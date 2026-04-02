@@ -1,0 +1,48 @@
+# Inspectors Dashboard
+
+The Inspectors page is where you manage and run your LLM-based quality evaluators.
+
+## Inspector list
+
+Each inspector card shows:
+
+- **Name**: the inspector's label
+- **Description**: what it evaluates
+- **Type**: binary (pass/fail) or scored (0.0 to 1.0)
+- **Status**: enabled or disabled
+- **Built-in badge**: whether it is one of Veil's 5 built-in inspectors
+
+## Running inspectors
+
+To evaluate sessions with an inspector:
+
+1. Go to the Inspectors page
+2. Select the inspector you want to run
+3. Click **Run** and select the sessions to evaluate
+4. Results appear on each session's detail page
+
+## Creating a custom inspector
+
+1. Click **New Inspector**
+2. Enter a name and description
+3. Choose the type (binary or scored)
+4. Write your evaluation prompt
+5. Save and enable the inspector
+
+Your prompt should instruct the evaluator to return a JSON object:
+
+```json
+{"passed": true, "score": 0.85, "explanation": "Task was completed fully"}
+```
+
+## Correcting results
+
+If an inspector's verdict on a session is wrong, open the session detail page and click **Mark as incorrect** next to the inspector result. Add a note explaining the correct answer.
+
+Veil uses your corrections as calibration examples for future evaluations, improving accuracy over time.
+
+## Disabling an inspector
+
+Toggle any inspector off to stop it from running on new evaluations. Existing results are preserved.
+
+See [Inspectors concept page](/concepts/inspectors) for a deeper explanation of how inspectors work.

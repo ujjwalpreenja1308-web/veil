@@ -7,8 +7,13 @@ import { Toaster } from "sonner";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Veil — AI Agent Observability",
+  title: "Veil",
   description: "Detect, classify, and alert on AI agent failures.",
+  icons: {
+    icon: "/logo.svg",
+    shortcut: "/logo.svg",
+    apple: "/logo.svg",
+  },
 };
 
 export default function RootLayout({

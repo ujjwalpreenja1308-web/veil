@@ -22,7 +22,16 @@
       "Bash(python -c \":*)",
       "Bash(find D:/Veil.dev/node_modules/@opentelemetry/otlp-transformer/build/src -name *.d.ts)",
       "Bash(xargs grep:*)",
-      "WebFetch(domain:docs.composio.dev)"
+      "WebFetch(domain:docs.composio.dev)",
+      "Bash(npx --yes @anthropic-ai/claude-code@latest skills add leonxlnx/taste-skill)",
+      "Bash(npm cache:*)",
+      "Bash(grep -r footer D:/Veil.dev/apps/landing/src --include=*.tsx --include=*.ts -l)",
+      "Bash(find D:/Veil.dev/apps/landing -name *.tsx)",
+      "Bash(powershell -Command \"Remove-Item ''D:/Veil.dev/.git/index.lock'' -Force\")",
+      "Bash(powershell -Command \"Get-Process | Where-Object { $_Modules.FileName -like ''*Veil*'' } | Select-Object Id, Name, MainWindowTitle\")",
+      "Bash(tasklist)",
+      "Bash(powershell -Command \"Stop-Process -Id 22388 -Force\")",
+      "Bash(powershell -Command \"Remove-Item ''D:\\\\Veil.dev\\\\.git\\\\index.lock'' -Force\")"
     ]
   }
 }

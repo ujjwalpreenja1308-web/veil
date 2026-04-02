@@ -89,6 +89,10 @@ export interface UIClassification {
   subcategory: string;
   severity: Classification["severity"];
   reason: string;
+  createdAt: string;
+  notes: string | null;
+  suggestionApplied: boolean;
+  suggestionAppliedAt: string | null;
 }
 
 export function presentClassification(c: Classification): UIClassification {
@@ -100,6 +104,10 @@ export function presentClassification(c: Classification): UIClassification {
     subcategory: c.subcategory,
     severity: c.severity,
     reason: c.reason,
+    createdAt: String(c.created_at ?? new Date().toISOString()),
+    notes: c.notes ?? null,
+    suggestionApplied: c.suggestion_applied ?? false,
+    suggestionAppliedAt: c.suggestion_applied_at ? String(c.suggestion_applied_at) : null,
   };
 }
 

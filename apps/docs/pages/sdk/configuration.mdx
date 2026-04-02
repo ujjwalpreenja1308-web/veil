@@ -1,0 +1,91 @@
+# Configuration
+
+## API key
+
+Your API key is available in the Veil dashboard under **Settings**. Keys always start with `vl_`.
+
+Store your key in an environment variable, never in source code:
+
+```bash
+export VEIL_API_KEY=vl_your_key_here
+```
+
+```python
+import os
+import veil
+
+veil.init(api_key=os.environ["VEIL_API_KEY"])
+```
+
+## Agent naming
+
+Use the `agent_name` parameter to give your agent a human-readable name:
+
+```python
+veil.init(api_key=os.environ["VEIL_API_KEY"], agent_name="Research Agent")
+```
+
+Naming conventions that work well:
+- Use the function or role of the agent: `"Email Drafter"`, `"Lead Scorer"`, `"Code Reviewer"`
+- Include the environment if you use the same key across staging and production: `"Support Agent (staging)"`
+- Keep names consistent across deployments so history accumulates on one agent in the dashboard
+
+## Self-hosting
+
+If you are running your own instance of Veil, pass your deployment URL as the `endpoint`:
+
+```python
+veil.init(
+    api_key=os.environ["VEIL_API_KEY"],
+    endpoint="https://veil.your-company.internal",
+)
+```
+
+## Using a .env file
+
+```bash
+# .env
+VEIL_API_KEY=vl_your_key_here
+VEIL_AGENT_NAME=My Agent
+```
+
+```python
+from dotenv import load_dotenv
+import os
+import veil
+
+load_dotenv()
+
+veil.init(
+    api_key=os.environ["VEIL_API_KEY"],
+    agent_name=os.environ.get("VEIL_AGENT_NAME", "default"),
+)
+```
+
+## Docker and containers
+
+Pass the API key as an environment variable in your container config:
+
+```yaml
+# docker-compose.yml
+services:
+  agent:
+    environment:
+      - VEIL_API_KEY=vl_your_key_here
+```
+
+```dockerfile
+# Dockerfile
+ENV VEIL_API_KEY=""
+```
+
+## CI/CD
+
+In GitHub Actions:
+
+```yaml
+- name: Run agent
+  env:
+    VEIL_API_KEY: ${{ secrets.VEIL_API_KEY }}
+  run: python agent.py
+```

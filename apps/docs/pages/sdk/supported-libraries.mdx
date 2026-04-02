@@ -1,0 +1,56 @@
+# Supported Libraries
+
+Veil automatically instruments all major LLM libraries. You do not need to change your existing code or add any library-specific configuration.
+
+## LLM providers
+
+| Library | Auto-instrumented |
+|---------|:-----------------:|
+| OpenAI | Yes |
+| Anthropic | Yes |
+| Google Gemini | Yes |
+| AWS Bedrock | Yes |
+| Cohere | Yes |
+| Mistral | Yes |
+| Groq | Yes |
+| Together AI | Yes |
+| Ollama | Yes |
+
+## Frameworks
+
+| Framework | Auto-instrumented |
+|-----------|:-----------------:|
+| LangChain | Yes |
+| LlamaIndex | Yes |
+| Haystack | Yes |
+| CrewAI | Yes |
+| AutoGen | Yes |
+| LiteLLM | Yes |
+
+## What gets captured per library
+
+For every LLM call, Veil captures:
+
+- Model name and version
+- Input prompt (truncated at 500 characters per event)
+- Output completion (truncated at 500 characters per event)
+- Token counts (prompt, completion, total)
+- Cost (computed from token counts and model pricing)
+- Latency in milliseconds
+- Any error messages
+
+For tool/function calls, Veil additionally captures:
+
+- Tool name
+- Tool input arguments
+- Tool output or error
+
+## Not seeing your library?
+
+Veil captures telemetry at the OpenTelemetry layer, which means any library that emits standard OpenTelemetry spans will work automatically. If your library is not in the list above, open an issue or contact support.
+
+import { Callout } from "nextra/components";
+
+<Callout type="info">
+  All captured data is processed server-side. Nothing is stored locally on your machine.
+</Callout>

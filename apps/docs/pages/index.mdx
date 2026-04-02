@@ -1,0 +1,38 @@
+# Welcome to Veil
+
+Veil is an observability platform for AI agents. Add one line of code and get automatic failure detection, classification, and alerts for every agent you run.
+
+```python
+import veil
+veil.init(api_key="vl_xxx")
+```
+
+That is it. No config files, no schema changes, no wrappers around your LLM calls.
+
+## What you get
+
+- **Automatic failure detection** across 10 failure categories including hallucinations, cost anomalies, tool failures, and infinite loops
+- **Session tracking** that groups every LLM call in a run into a single timeline
+- **Inspectors** that run LLM-based quality checks on your sessions
+- **Alerts** via Slack and email when something goes wrong
+- **Cost tracking** broken down by agent and time period
+- **Pattern detection** that surfaces recurring failures across sessions
+
+## Get started
+
+import { Cards, Card } from "nextra/components";
+
+<Cards>
+  <Card title="Quickstart" href="/quickstart" arrow>
+    Add Veil to your agent in 2 minutes
+  </Card>
+  <Card title="How it works" href="/concepts/how-it-works" arrow>
+    Architecture and data flow
+  </Card>
+  <Card title="SDK Reference" href="/sdk/python" arrow>
+    Full Python SDK documentation
+  </Card>
+  <Card title="Dashboard" href="/dashboard/overview" arrow>
+    What to look for in your dashboard
+  </Card>
+</Cards>

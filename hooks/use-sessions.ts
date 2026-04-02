@@ -1,15 +1,33 @@
+"use client";
+
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import type { UISession, UIEvent, UIClassification } from "@/lib/presenter";
 
+const PAGE_SIZE = 50;
+
 export function useSessions() {
-  return useQuery({
-    queryKey: ["sessions"],
-    queryFn: () => apiFetch<{ sessions: UISession[] }>("/api/sessions"),
-    select: (data) => data.sessions,
+  const [limit, setLimit] = useState(PAGE_SIZE);
+
+  const query = useQuery({
+    queryKey: ["sessions", limit],
+    queryFn: () =>
+      apiFetch<{ sessions: UISession[]; hasMore: boolean }>(`/api/sessions?limit=${limit}`),
     refetchInterval: 10_000,
     staleTime: 10_000,
   });
+
+  function loadMore() {
+    setLimit((prev) => prev + PAGE_SIZE);
+  }
+
+  return {
+    ...query,
+    data: query.data?.sessions,
+    hasMore: query.data?.hasMore ?? false,
+    loadMore,
+  };
 }
 
 export function useSession(id: string) {

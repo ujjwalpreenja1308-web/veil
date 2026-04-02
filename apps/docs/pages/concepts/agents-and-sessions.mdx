@@ -1,0 +1,58 @@
+# Agents and Sessions
+
+## Agents
+
+An agent in Veil is a named entity that maps to a specific AI agent in your codebase. Agents are created automatically the first time telemetry is received with a given name.
+
+You set the agent name with the `agent_name` parameter:
+
+```python
+veil.init(api_key="vl_xxx", agent_name="Customer Support Agent")
+```
+
+If you omit `agent_name`, it defaults to `"default"`. Give your agents descriptive names so they are easy to identify in the dashboard.
+
+### Multiple agents
+
+If you run several different agents in your application, initialize each one separately with a distinct name:
+
+```python
+# In your support agent script
+veil.init(api_key="vl_xxx", agent_name="Support Agent")
+
+# In your sales agent script
+veil.init(api_key="vl_xxx", agent_name="Sales Agent")
+```
+
+Each agent gets its own page in the dashboard with its own session history, failure stats, and cost breakdown.
+
+## Sessions
+
+A session represents one execution of your agent from start to finish. Every time you run your agent script, a new session is created.
+
+### Session lifecycle
+
+| State | Description |
+|-------|-------------|
+| `running` | Agent is actively executing |
+| `completed` | Agent finished with no failures detected |
+| `failed` | A failure was detected and classified |
+| `timed_out` | Session was still open after 1 hour (agent likely crashed) |
+
+### What a session contains
+
+- Full timeline of every LLM call, tool call, and error
+- Total cost for the session
+- Total duration
+- Failure classification (if any)
+- Inspector results (if inspectors are enabled)
+
+### Session timeline
+
+Each event in a session has a step number, type, and payload. The timeline shows you exactly what your agent did in order, making it easy to trace back to the root cause of a failure.
+
+import { Callout } from "nextra/components";
+
+<Callout>
+  Sessions are automatically timed out after 1 hour if the agent crashes before sending a session end signal. This prevents orphaned sessions from clogging your dashboard.
+</Callout>

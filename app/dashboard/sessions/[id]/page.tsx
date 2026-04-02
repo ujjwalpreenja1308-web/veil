@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SessionTimeline } from "@/components/veil/SessionTimeline";
 import { AlertCard } from "@/components/veil/AlertCard";
-import { ArrowLeft } from "lucide-react";
+import { SuggestionCard } from "@/components/veil/SuggestionCard";
+import { ArrowLeft, FlaskConical } from "lucide-react";
 import { useSession } from "@/hooks/use-sessions";
 import { formatDistanceToNow, format } from "date-fns";
 
@@ -18,7 +20,6 @@ const statusVariant: Record<string, "default" | "secondary" | "destructive"> = {
 
 export default function SessionDetailPage({ params }: { params: { id: string } }) {
   const { data, isLoading } = useSession(params.id);
-
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -84,19 +85,47 @@ export default function SessionDetailPage({ params }: { params: { id: string } }
         ))}
       </div>
 
-      {/* Classifications */}
+      {/* Classifications + Suggestions */}
       {classifications.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-lg font-semibold">Failures Detected</h2>
           {classifications.map((c) => (
-            <AlertCard
-              key={c.id}
-              classification={{
-                ...c,
-                session: { id: session.id, startedAt: session.startedAt },
-              }}
-            />
+            <div key={c.id} className="space-y-2">
+              <AlertCard
+                classification={{
+                  ...c,
+                  session: { id: session.id, startedAt: session.startedAt },
+                }}
+              />
+              <SuggestionCard classification={c} sessionId={session.id} />
+            </div>
           ))}
+        </div>
+      )}
+
+      {/* Inspector */}
+      {session.agentId && (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold">Inspector</h2>
+          <Card>
+            <CardContent className="flex items-center justify-between py-4">
+              <div className="flex items-center gap-3">
+                <FlaskConical className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Deep Agent Analysis</p>
+                  <p className="text-xs text-muted-foreground">
+                    Run Inspector on this agent to find root causes, patterns, and fixes across all sessions.
+                  </p>
+                </div>
+              </div>
+              <Link href={`/dashboard/inspectors?agent_id=${session.agentId}`}>
+                <Button variant="outline" size="sm" className="gap-1.5 shrink-0">
+                  <FlaskConical className="h-3.5 w-3.5" />
+                  View Inspector
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
         </div>
       )}
 

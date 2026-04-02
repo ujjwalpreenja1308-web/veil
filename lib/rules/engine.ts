@@ -153,6 +153,32 @@ export function classify(events: ClassifiableEvent[]): ClassificationResult | nu
     };
   }
 
+  // ── Hallucination ──────────────────────────────────────────────────────────
+  // Detects when the model output contains self-contradiction signals or
+  // explicit uncertainty markers that indicate fabricated content.
+  const hallucinationPatterns = [
+    /I (don't|do not) (actually |really )?(have|know|recall) (access|information|details)/i,
+    /as of my (knowledge |training )?(cut.?off|cutoff|date)/i,
+    /I (may|might) (have |be )?(fabricated|made (that |this )?up|hallucinated)/i,
+    /I (cannot|can't) (verify|confirm|guarantee) (the accuracy|this|that)/i,
+    /this (information |claim )?(may|might|could) (be |not be )?(incorrect|inaccurate|wrong|outdated)/i,
+    /I (invented|fabricated|made up) (that|this|the)/i,
+  ];
+  const hallucinationEvent = events.find((e) => {
+    const output = String(
+      e.payload["gen_ai.completion"] ?? e.payload.output ?? e.payload.result ?? ""
+    );
+    return hallucinationPatterns.some((p) => p.test(output));
+  });
+  if (hallucinationEvent) {
+    return {
+      category: "hallucination",
+      subcategory: "self_reported_uncertainty",
+      severity: "high",
+      reason: "Model output contains self-reported fabrication or unverifiable claim signals",
+    };
+  }
+
   // ── Silent failure ─────────────────────────────────────────────────────────
   const lastEvent = events[events.length - 1];
   const hasOutput = events.some((e) =>

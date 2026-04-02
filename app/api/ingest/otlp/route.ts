@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { normalizeOtlp } from "@/lib/normalizer";
 import { classify } from "@/lib/rules/engine";
 import { logger } from "@/lib/logger";
-import { ratelimit } from "@/lib/ratelimit";
+import { checkRateLimit } from "@/lib/ratelimit";
 import { sendFailureAlert } from "@/lib/alerts/email";
 import { sendSlackAlert } from "@/lib/alerts/slack";
 import type { Organization } from "@/lib/db/schema";
@@ -38,8 +38,8 @@ export async function POST(req: NextRequest) {
   }
 
   // Rate limiting — per api_key sliding window (fail open when Redis not configured)
-  if (ratelimit) {
-    const { success, limit, remaining, reset } = await ratelimit.limit(effectiveKey);
+  {
+    const { success, limit, remaining, reset } = await checkRateLimit(effectiveKey);
     if (!success) {
       logger.warn("[ingest/otlp] Rate limit exceeded", { orgId: org.id, limit, reset });
       return NextResponse.json(
@@ -67,8 +67,8 @@ export async function POST(req: NextRequest) {
       body = await req.json();
     } else {
       // Protobuf binary — decode using internal OTLP proto definitions
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const root = require("@opentelemetry/otlp-transformer/build/src/generated/root");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const root = ((await import("@opentelemetry/otlp-transformer/build/src/generated/root")) as any).default ?? (await import("@opentelemetry/otlp-transformer/build/src/generated/root"));
       const buf = new Uint8Array(await req.arrayBuffer());
       if (pathname.includes("/logs")) {
         const decoded = root.opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest.decode(buf);

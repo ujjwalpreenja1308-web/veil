@@ -1,0 +1,33 @@
+# Overview
+
+The Overview page is your main dashboard. It shows a live summary of all your agents in one place.
+
+## Stat cards
+
+Four cards at the top show:
+
+- **Total Agents**: number of agents that have sent telemetry
+- **Sessions Today**: number of sessions started today
+- **Failures Today**: sessions that ended with a failure classification
+- **Cost Today**: total LLM spend across all agents today
+
+## Failure patterns
+
+Below the stat cards, the dashboard surfaces recurring failure patterns detected across your sessions in the last 7 days. If the same failure category keeps appearing for the same agent, it is listed here with the count and severity.
+
+Use this section to prioritize fixes. A pattern with 10 occurrences is more urgent than a one-off.
+
+## Agent list
+
+The bottom of the page lists every agent. Each row shows:
+
+- Health indicator (green/yellow/red)
+- Agent name
+- Session count
+- Status of the most recent session
+
+Click any agent to go to its detail page.
+
+## Live indicator
+
+The dashboard polls for new data every 10 seconds. A live badge in the top right pulses when a refresh is in progress.

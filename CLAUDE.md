@@ -67,7 +67,6 @@ veil.init(api_key="vl_xxx")   ← this is it
 - Never store raw OpenLIT data without normalizing
 - Never let OpenLIT schema leak into core models
 - Never add engineer-facing config beyond api_key
-- Never push directly to main branch
 - Never merge without CodeRabbit review
 - Never build features not in this document
 - Never push directly to git always create PRs

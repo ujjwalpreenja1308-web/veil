@@ -8,9 +8,13 @@ import { AgentStatusBadge } from "@/components/veil/AgentStatusBadge";
 import { Bot, ScrollText, AlertTriangle, DollarSign, Loader2 } from "lucide-react";
 import { useOverviewStats } from "@/hooks/use-stats";
 import { useAgents, usePrefetchAgent } from "@/hooks/use-agents";
+import { usePatterns } from "@/hooks/use-patterns";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { LiveBadge } from "@/components/veil/LiveBadge";
+import { PatternCard } from "@/components/veil/PatternCard";
+import { OnboardingBanner } from "@/components/veil/OnboardingBanner";
+import { useSlackConnection } from "@/hooks/use-slack-connection";
 import type { HealthStatus } from "@/components/veil/HealthIndicator";
 
 const healthFromStatus = (status: string | null): HealthStatus => {
@@ -34,6 +38,8 @@ export default function DashboardPage() {
   const { data: me, isLoading: meLoading } = useProvisioningStatus();
   const { data: stats, isLoading: statsLoading, isFetching: statsFetching } = useOverviewStats();
   const { data: agents, isLoading: agentsLoading, isFetching: agentsFetching } = useAgents();
+  const { data: patterns } = usePatterns(7);
+  const { data: slackData } = useSlackConnection();
   const prefetchAgent = usePrefetchAgent();
 
   // Show provisioning screen only on first load (no cached data yet)
@@ -66,6 +72,13 @@ export default function DashboardPage() {
         <LiveBadge isFetching={statsFetching || agentsFetching} />
       </div>
 
+      {/* Onboarding */}
+      <OnboardingBanner
+        hasAgents={!!agents?.length}
+        hasSessions={!!stats?.sessionsToday || false}
+        slackConnected={slackData?.connected ?? false}
+      />
+
       {/* Stat Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {statCards.map((stat) => (
@@ -86,6 +99,23 @@ export default function DashboardPage() {
           </Card>
         ))}
       </div>
+
+      {/* Failure Patterns — only shown when patterns exist */}
+      {patterns && patterns.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-xl font-semibold">Failure Patterns</h2>
+          {patterns.slice(0, 3).map((p) => (
+            <PatternCard key={`${p.agentId}-${p.category}`} pattern={p} windowDays={7} />
+          ))}
+          {patterns.length > 3 && (
+            <p className="text-sm text-muted-foreground text-center">
+              <a href="/dashboard/patterns" className="underline underline-offset-4">
+                View all {patterns.length} patterns →
+              </a>
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Agent List */}
       <div>

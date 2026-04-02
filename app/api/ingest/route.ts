@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { normalize } from "@/lib/normalizer";
 import { classify } from "@/lib/rules/engine";
 import { logger } from "@/lib/logger";
-import { ratelimit } from "@/lib/ratelimit";
+import { reportError } from "@/lib/error-reporter";
+import { checkRateLimit } from "@/lib/ratelimit";
 import { sendFailureAlert } from "@/lib/alerts/email";
 import { sendSlackAlert } from "@/lib/alerts/slack";
 import {
@@ -14,7 +15,17 @@ import {
   insertClassification,
   getEventsBySession,
   getSessionById,
+  getSessionEventCount,
 } from "@/lib/db/queries";
+
+// Returns the next step number for a session (used when client omits step)
+async function getNextStep(orgId: string, sessionId: string): Promise<number> {
+  try {
+    return (await getSessionEventCount(orgId, sessionId)) + 1;
+  } catch {
+    return 1;
+  }
+}
 
 export async function POST(req: NextRequest) {
   const apiKey =
@@ -32,23 +43,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid api_key" }, { status: 401 });
   }
 
-  // Rate limiting — per api_key sliding window (fail open when Redis not configured)
-  if (ratelimit) {
-    const { success, limit, remaining, reset } = await ratelimit.limit(apiKey);
-    if (!success) {
-      logger.warn("[ingest] Rate limit exceeded", { orgId: org.id, limit, reset });
-      return NextResponse.json(
-        { error: "Rate limit exceeded" },
-        {
-          status: 429,
-          headers: {
-            "X-RateLimit-Limit": String(limit),
-            "X-RateLimit-Remaining": String(remaining),
-            "X-RateLimit-Reset": String(reset),
-          },
-        }
-      );
-    }
+  // Rate limiting — per api_key sliding window (always enforced; Redis upgrades to distributed)
+  const { success, limit, remaining, reset } = await checkRateLimit(apiKey);
+  if (!success) {
+    logger.warn("[ingest] Rate limit exceeded", { orgId: org.id, limit, reset });
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      {
+        status: 429,
+        headers: {
+          "X-RateLimit-Limit": String(limit),
+          "X-RateLimit-Remaining": String(remaining),
+          "X-RateLimit-Reset": String(reset),
+        },
+      }
+    );
   }
 
   let body: unknown;
@@ -64,9 +73,10 @@ export async function POST(req: NextRequest) {
     event = normalize(body);
   } catch (err) {
     logger.exception("[ingest] Failed to normalize payload", err, { orgId: org.id });
+    const status = (err as { status?: number }).status === 422 ? 422 : 422;
     return NextResponse.json(
-      { error: "Failed to normalize payload", detail: String(err) },
-      { status: 422 }
+      { error: "Failed to normalize payload", detail: (err as Error).message },
+      { status }
     );
   }
 
@@ -96,13 +106,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Auto-increment step if client sent 0 or omitted it (prevents timeline ordering issues)
+    const step = event.step > 0
+      ? event.step
+      : await getNextStep(orgId, session.id);
+
     try {
-      await insertEvent(orgId, session.id, event.step, event.type, event.payload, event.timestamp);
+      await insertEvent(orgId, session.id, step, event.type, event.payload, event.timestamp);
     } catch (err) {
       logger.exception("[ingest] Failed to insert event", err, {
         orgId,
         sessionId: session.id,
-        step: event.step,
+        step,
         type: event.type,
       });
       throw err;
@@ -174,9 +189,20 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ status: "ok", session_id: session.id });
+    return NextResponse.json({
+      status: "ok",
+      session_id: session.id,
+      // Explicitly echo back for session.start so webhook clients can confirm
+      ...(event.type === "session.start" && { started: true }),
+    });
   } catch (err) {
     logger.exception("[ingest] Unhandled error", err, { orgId });
+    reportError({
+      route: "/api/ingest",
+      message: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+      org_id: orgId,
+    });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

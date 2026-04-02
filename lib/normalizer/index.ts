@@ -137,17 +137,70 @@ export function normalizeOtlp(raw: unknown): NormalizedEvent[] {
   return events;
 }
 
-// Normalize a single Veil-native event (sent by SDK session.end handler).
+// Validate and throw with a 422-friendly message if the Veil-native payload is malformed.
+function validateVeilPayload(p: RawVeilPayload): void {
+  if (!p.session_id || typeof p.session_id !== "string" || p.session_id.length > 128) {
+    throw Object.assign(new Error("session_id must be a non-empty string (max 128 chars)"), { status: 422 });
+  }
+  if (!/^[a-zA-Z0-9_-]+$/.test(p.session_id)) {
+    throw Object.assign(new Error("session_id may only contain letters, numbers, hyphens and underscores"), { status: 422 });
+  }
+  if (!p.type || typeof p.type !== "string") {
+    throw Object.assign(new Error("type must be a non-empty string"), { status: 422 });
+  }
+  if (p.step !== undefined && (!Number.isInteger(p.step) || p.step < 0)) {
+    throw Object.assign(new Error("step must be a non-negative integer"), { status: 422 });
+  }
+  if (p.payload !== undefined) {
+    if (typeof p.payload !== "object" || Array.isArray(p.payload) || p.payload === null) {
+      throw Object.assign(new Error("payload must be a plain object"), { status: 422 });
+    }
+    if (JSON.stringify(p.payload).length > 10_240) {
+      throw Object.assign(new Error("payload exceeds 10KB limit"), { status: 422 });
+    }
+  }
+  if (p.timestamp !== undefined) {
+    const d = new Date(p.timestamp);
+    if (isNaN(d.getTime())) {
+      throw Object.assign(new Error("timestamp must be a valid ISO 8601 string"), { status: 422 });
+    }
+    if (d.getTime() > Date.now() + 60 * 60 * 1000) {
+      throw Object.assign(new Error("timestamp cannot be more than 1 hour in the future"), { status: 422 });
+    }
+  }
+}
+
+// Map webhook-friendly field names to canonical OpenLIT names so the
+// classification engine works without modification.
+function applyAliases(p: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...p };
+  if ("model"     in out && !("gen_ai.request.model"   in out)) out["gen_ai.request.model"]   = out.model;
+  if ("input"     in out && !("gen_ai.prompt"          in out)) out["gen_ai.prompt"]           = out.input;
+  if ("output"    in out && !("gen_ai.completion"      in out)) out["gen_ai.completion"]       = out.output;
+  if ("error"     in out && !("gen_ai.error.message"   in out)) out["gen_ai.error.message"]    = out.error;
+  if ("tool_name" in out && !("gen_ai.tool.name"       in out)) out["gen_ai.tool.name"]        = out.tool_name;
+  if ("cost"      in out && !("gen_ai.usage.cost"      in out)) out["gen_ai.usage.cost"]       = out.cost;
+  if ("prompt_tokens" in out && !("gen_ai.usage.prompt_tokens" in out)) out["gen_ai.usage.prompt_tokens"] = out.prompt_tokens;
+  if ("completion_tokens" in out && !("gen_ai.usage.completion_tokens" in out)) out["gen_ai.usage.completion_tokens"] = out.completion_tokens;
+  // Convert duration_ms → duration_ns so the latency classifier works
+  if ("duration_ms" in out && !("duration_ns" in out)) {
+    out["duration_ns"] = Number(out.duration_ms) * 1_000_000;
+  }
+  return out;
+}
+
+// Normalize a single Veil-native event (sent by SDK or webhook clients).
 export function normalize(raw: unknown): NormalizedEvent {
   const payload = raw as RawVeilPayload;
 
   if (payload.session_id && payload.type) {
+    validateVeilPayload(payload);
     return {
       sessionId: payload.session_id,
       orgId: payload.org_id ?? "",
       step: payload.step ?? 0,
       type: payload.type,
-      payload: payload.payload ?? {},
+      payload: applyAliases(payload.payload ?? {}),
       timestamp: payload.timestamp ? new Date(payload.timestamp) : new Date(),
     };
   }
