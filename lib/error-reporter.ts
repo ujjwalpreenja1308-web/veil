@@ -33,22 +33,6 @@ export function reportError(report: ErrorReport): void {
       });
     }
 
-    // Slack ping for immediate visibility
-    try {
-      const channel = process.env.SLACK_OPS_CHANNEL ?? process.env.SLACK_ALERT_CHANNEL;
-      if (!channel) return;
 
-      const { WebClient } = await import("@slack/web-api");
-      const token = process.env.SLACK_BOT_TOKEN;
-      if (!token) return;
-
-      const slack = new WebClient(token);
-      await slack.chat.postMessage({
-        channel,
-        text: `:rotating_light: *Production error* in \`${report.route}\`\n>${report.message}${report.org_id ? `\norg: \`${report.org_id}\`` : ""}`,
-      });
-    } catch {
-      // Slack failure is not critical — already written to DB
-    }
   })();
 }

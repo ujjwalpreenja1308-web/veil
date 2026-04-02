@@ -1,7 +1,7 @@
 // All database queries — every query MUST include org_id for tenant isolation
 import { supabase } from "@/lib/supabase";
 import { logger } from "@/lib/logger";
-import type { Agent, Session, Event, Classification, Organization } from "./schema";
+import type { Agent, Session, Event, Classification, Organization, InspectorRun } from "./schema";
 
 // ─── Organizations ────────────────────────────────────────────────────────────
 
@@ -130,6 +130,16 @@ export async function completeSession(
 }
 
 // ─── Events ───────────────────────────────────────────────────────────────────
+
+export async function getSessionEventCount(orgId: string, sessionId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from("events")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", orgId)
+    .eq("session_id", sessionId);
+  if (error) throw error;
+  return count ?? 0;
+}
 
 export async function getEventsBySession(orgId: string, sessionId: string): Promise<Event[]> {
   const { data, error } = await supabase
@@ -408,7 +418,7 @@ export async function getFailurePatterns(
 
   const patterns: FailurePattern[] = [];
 
-  for (const g of groups.values()) {
+  for (const g of Array.from(groups.values())) {
     if (g.rows.length < minCount) continue;
 
     // Count subcategories
@@ -435,6 +445,20 @@ export async function getFailurePatterns(
   }
 
   return patterns.sort((a, b) => b.count - a.count);
+}
+
+// ─── Orphaned Sessions ────────────────────────────────────────────────────────
+
+export async function expireOrphanedSessions(olderThanMs: number): Promise<number> {
+  const cutoff = new Date(Date.now() - olderThanMs).toISOString();
+  const { data, error } = await supabase
+    .from("sessions")
+    .update({ status: "failed", failure_type: "timed_out", completed_at: new Date().toISOString() })
+    .eq("status", "running")
+    .lt("started_at", cutoff)
+    .select("id");
+  if (error) throw error;
+  return (data ?? []).length;
 }
 
 // ─── Fixes ────────────────────────────────────────────────────────────────────
@@ -552,4 +576,54 @@ export async function getFixImpact(orgId: string, fixId: string): Promise<FixImp
     afterDays,
     deltaPercent,
   };
+}
+
+// ─── Inspector Runs ───────────────────────────────────────────────────────────
+
+export async function createInspectorRun(params: {
+  org_id: string;
+  agent_id: string;
+  triggered_by: string;
+}): Promise<InspectorRun> {
+  const { data, error } = await supabase
+    .from("inspector_runs")
+    .insert({ ...params, status: "pending" })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as InspectorRun;
+}
+
+export async function getInspectorRunsByOrg(
+  orgId: string,
+  opts?: { agentId?: string; limit?: number }
+): Promise<InspectorRun[]> {
+  let query = supabase
+    .from("inspector_runs")
+    .select("*")
+    .eq("org_id", orgId)
+    .order("created_at", { ascending: false })
+    .limit(opts?.limit ?? 50);
+
+  if (opts?.agentId) {
+    query = query.eq("agent_id", opts.agentId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as InspectorRun[];
+}
+
+export async function getInspectorRun(
+  orgId: string,
+  runId: string
+): Promise<InspectorRun | null> {
+  const { data, error } = await supabase
+    .from("inspector_runs")
+    .select("*")
+    .eq("org_id", orgId)
+    .eq("id", runId)
+    .single();
+  if (error) return null;
+  return data as InspectorRun;
 }

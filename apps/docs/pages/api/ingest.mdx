@@ -1,0 +1,91 @@
+# Ingest API
+
+The Ingest API is how telemetry reaches Veil. The SDK handles this automatically. You only need this reference if you are building a custom integration.
+
+## Authentication
+
+All ingest endpoints authenticate via API key. Pass your key in the `x-api-key` header:
+
+```
+x-api-key: vl_your_key_here
+```
+
+Or as a query parameter:
+
+```
+POST /api/ingest?api_key=vl_your_key_here
+```
+
+## POST /api/ingest
+
+Send a single telemetry event.
+
+**Request**
+
+```http
+POST /api/ingest
+Content-Type: application/json
+x-api-key: vl_your_key_here
+```
+
+```json
+{
+  "session_id": "550e8400-e29b-41d4-a716-446655440000",
+  "type": "llm.call",
+  "step": 1,
+  "payload": {
+    "gen_ai.system": "openai",
+    "gen_ai.prompt": "Summarize this document...",
+    "gen_ai.completion": "The document discusses...",
+    "gen_ai.usage.prompt_tokens": 120,
+    "gen_ai.usage.completion_tokens": 45,
+    "gen_ai.usage.cost": 0.0003
+  },
+  "timestamp": "2024-01-15T10:30:00Z"
+}
+```
+
+**Event types**
+
+| Type | Description |
+|------|-------------|
+| `session.start` | Marks the beginning of a session |
+| `session.end` | Closes the session and triggers classification |
+| `llm.call` | A single LLM API call |
+| `tool.call` | A tool or function call |
+| `error` | An error or exception |
+
+**Response**
+
+```json
+{
+  "status": "ok",
+  "session_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+## POST /api/ingest/otlp
+
+Accept OpenTelemetry trace spans in JSON or Protobuf format.
+
+**Request**
+
+```http
+POST /api/ingest/otlp
+Content-Type: application/json
+x-api-key: vl_your_key_here
+```
+
+The request body follows the [OTLP/HTTP JSON format](https://opentelemetry.io/docs/specs/otlp/).
+
+## Rate limits
+
+- 100 requests per minute per API key
+- Exceeding the limit returns HTTP 429
+
+```http
+HTTP/1.1 429 Too Many Requests
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1705312260000
+```

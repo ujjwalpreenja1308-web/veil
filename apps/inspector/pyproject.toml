@@ -1,0 +1,20 @@
+[project]
+name = "veil-inspector"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.34",
+    "crewai>=0.100",
+    "supabase>=2.0",
+    "pydantic-settings>=2.0",
+    "python-dotenv>=1.0",
+]
+
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.backends.legacy:build"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]

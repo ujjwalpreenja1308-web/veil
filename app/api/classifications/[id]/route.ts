@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { getSessionById, updateClassification, getClassificationsBySession } from "@/lib/db/queries";
-import { getOrgByClerkUser } from "@/lib/db/clerk";
-import { withApiHandler, withTimeout } from "@/lib/api-handler";
+import { updateClassification } from "@/lib/db/queries";
+import { getOrgId } from "@/lib/db/clerk";
+import { withApiHandler } from "@/lib/api-handler";
 
 export const PATCH = withApiHandler(async (
   req: NextRequest,
@@ -11,8 +11,8 @@ export const PATCH = withApiHandler(async (
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const org = await withTimeout(() => getOrgByClerkUser(userId), 5_000, "getOrgByClerkUser");
-  if (!org) return NextResponse.json({ error: "Organization not found" }, { status: 404 });
+  const orgId = await getOrgId(userId);
+  if (!orgId) return NextResponse.json({ error: "Organization not found" }, { status: 404 });
 
   let body: { notes?: string | null; suggestion_applied?: boolean };
   try {

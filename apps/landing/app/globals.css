@@ -1,0 +1,111 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap');
+
+@font-face {
+  font-family: 'SF Pro Display';
+  src: url('/SFPRODISPLAYREGULAR.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'PPEditorialNew';
+  src: url('/PPEditorialNew-Regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'PPEditorialNew';
+  src: url('/PPEditorialNew-Ultralight.woff') format('woff');
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'PPEditorialNew';
+  src: url('/PPEditorialNew-Ultralight.woff') format('woff');
+  font-weight: 200;
+  font-style: italic;
+  font-display: swap;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 232 232 240;
+  --foreground: 255 255 255;
+  --card: 8 8 16;
+  --card-foreground: 255 255 255;
+  --muted: 30 30 50;
+  --muted-foreground: 150 150 180;
+  --primary: 59 130 246;
+  --primary-foreground: 255 255 255;
+  --border: 255 255 255 / 0.07;
+  --accent-blue: #3b82f6;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: #080810;
+  color: #ffffff;
+  font-family: 'SF Pro Display', 'SF Pro Text', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: #080810;
+}
+::-webkit-scrollbar-thumb {
+  background: #1c1c2e;
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3b82f6;
+}
+
+/* Selection */
+::selection {
+  background: rgba(59, 130, 246, 0.25);
+  color: #ffffff;
+}
+
+/* Marquee ribbon animation */
+@keyframes marquee-left {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  animation: marquee-left 28s linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* Code block syntax */
+.code-comment  { color: #4b5563; }
+.code-keyword  { color: #3b82f6; }
+.code-string   { color: #60a5fa; }
+.code-function { color: #93c5fd; }

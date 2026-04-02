@@ -1,0 +1,29 @@
+# Patterns
+
+The Patterns page surfaces recurring failures across your sessions. Instead of reviewing sessions one by one, patterns group similar failures so you can see what is happening at scale.
+
+## What is a pattern
+
+A pattern is a group of sessions with the same failure category on the same agent, occurring within a rolling time window. For a pattern to be shown, at least 2 sessions must match.
+
+## Pattern card
+
+Each pattern shows:
+
+- **Agent**: which agent is affected
+- **Failure category**: what type of failure is recurring
+- **Severity**: worst severity seen in the pattern
+- **Session count**: how many sessions matched
+- **Subcategories**: breakdown of specific failure variants in the group
+- **Time window**: the period this pattern covers (default: last 7 days)
+
+## How to use patterns
+
+1. Find the pattern with the highest session count or severity
+2. Click through to the agent or a session in the pattern
+3. Review the event timeline to find the root cause
+4. Apply a fix and track its impact in the [Fixes](/dashboard/fixes) section
+
+## Pattern window
+
+By default, patterns are computed over the last 7 days. A pattern disappears from this page when no new matching sessions occur within the window.

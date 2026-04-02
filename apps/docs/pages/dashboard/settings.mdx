@@ -1,0 +1,23 @@
+# Settings
+
+The Settings page is where you manage your API keys and integrations.
+
+## API keys
+
+Your Veil API key is shown here. Copy it and pass it to `veil.init()` in your agent code.
+
+Keys follow the format `vl_` followed by 64 hex characters. The full key is only shown once; the dashboard masks it after the first view. If you lose your key, you can regenerate it here.
+
+import { Callout } from "nextra/components";
+
+<Callout type="warning">
+  Regenerating your API key invalidates the old one immediately. Any agents still using the old key will stop sending telemetry.
+</Callout>
+
+## Slack integration
+
+Connect Slack to receive failure alerts in a channel of your choice. Click **Connect Slack**, authorize the OAuth flow, and choose a channel. See [Slack integration](/integrations/slack) for details.
+
+## Account
+
+Your account email and plan details are shown at the bottom of the Settings page.

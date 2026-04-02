@@ -1,6 +1,6 @@
 "use client";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, QueryCache } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -28,20 +28,16 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
             },
           },
         },
-        queryCache: (() => {
-          // Import inline to avoid circular issues with QueryCache
-          const { QueryCache } = require("@tanstack/react-query");
-          return new QueryCache({
-            onError: (error, query) => {
-              // Only show toast on background refetch failures (not initial load)
-              // so we don't spam on first mount
-              if (query.state.data !== undefined) {
-                const msg = error instanceof Error ? error.message : "Failed to refresh data";
-                toast.error(`Data refresh failed: ${msg}`, { id: String(query.queryKey[0]) });
-              }
-            },
-          });
-        })(),
+        queryCache: new QueryCache({
+          onError: (error, query) => {
+            // Only show toast on background refetch failures (not initial load)
+            // so we don't spam on first mount
+            if (query.state.data !== undefined) {
+              const msg = error instanceof Error ? error.message : "Failed to refresh data";
+              toast.error(`Data refresh failed: ${msg}`, { id: String(query.queryKey[0]) });
+            }
+          },
+        }),
       })
   );
 
