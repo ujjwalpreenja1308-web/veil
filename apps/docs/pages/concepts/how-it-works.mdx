@@ -1,0 +1,61 @@
+# How Veil Works
+
+## Architecture overview
+
+```
+Your Agent
+    │
+    ▼
+veil.init()  ←  one line of code
+    │
+    ▼
+Auto-instrumentation
+(LLM calls, tool calls, errors captured automatically)
+    │
+    ▼  async, fire-and-forget
+Veil Ingest API
+    │
+    ├── Normalize events
+    ├── Classify failures
+    ├── Store session timeline
+    └── Send alerts
+            │
+            ▼
+    Veil Dashboard
+```
+
+## What gets captured
+
+When you call `veil.init()`, Veil hooks into your LLM library at the framework level. Every LLM call your agent makes is captured without any changes to your code. This includes:
+
+- Prompts and completions
+- Model name and version
+- Token counts
+- Latency per call
+- Tool/function calls and their results
+- Errors and exceptions
+
+## Async by design
+
+All telemetry collection is non-blocking. Veil adds less than 5ms of overhead to your agent. Your agent's execution is never paused or slowed by Veil.
+
+## Sessions
+
+A session represents one complete run of your agent from start to finish. Veil automatically:
+
+1. Creates a session when your agent starts
+2. Groups all LLM calls from that run into the session
+3. Closes the session when your script exits
+4. Classifies any failures detected in the session
+
+## Failure detection
+
+After a session closes, Veil runs the classification engine against all captured events. This is a rules-based system that checks for 10 categories of failures. If a failure is found, it is stored with the session and an alert is sent.
+
+See [Failure Classification](/concepts/failure-classification) for the full list.
+
+## Inspectors
+
+In addition to rule-based classification, you can enable Inspectors. These are LLM-based evaluators that run on your sessions and check for things like hallucinations, user frustration, and task completion.
+
+See [Inspectors](/concepts/inspectors) for more.

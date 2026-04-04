@@ -1,0 +1,68 @@
+# Installation
+
+## Requirements
+
+- Python 3.9 or higher
+- An active internet connection (telemetry is sent asynchronously)
+
+## Install via pip
+
+```bash
+pip install veil-sdk
+```
+
+## Install via uv
+
+```bash
+uv add veil-sdk
+```
+
+## Install via Poetry
+
+```bash
+poetry add veil-sdk
+```
+
+## Verify the installation
+
+```python
+import veil
+print(veil.__version__)
+```
+
+## Dependencies
+
+`veil-sdk` has a single dependency that installs automatically. You do not need to install anything else manually.
+
+## Using environment variables
+
+Avoid hardcoding your API key. Store it in an environment variable instead:
+
+```bash
+# .env
+VEIL_API_KEY=vl_your_key_here
+```
+
+```python
+import os
+import veil
+
+veil.init(api_key=os.environ["VEIL_API_KEY"])
+```
+
+Or with `python-dotenv`:
+
+```python
+from dotenv import load_dotenv
+import os
+import veil
+
+load_dotenv()
+veil.init(api_key=os.environ["VEIL_API_KEY"])
+```
+
+import { Callout } from "nextra/components";
+
+<Callout type="warning">
+  Never commit your API key to version control. Use environment variables or a secrets manager.
+</Callout>

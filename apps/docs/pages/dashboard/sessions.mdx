@@ -1,0 +1,53 @@
+# Sessions
+
+A session is one complete run of your agent. The Sessions page lists all sessions across all agents.
+
+## Session list
+
+Each session shows:
+
+- **Status badge**: running, completed, failed, or timed out
+- **Agent name**
+- **Failure type**: if a failure was detected, the category is shown
+- **Cost**: total LLM spend for this session
+- **Duration**
+- **Start time**
+
+## Session detail page
+
+Click any session to see a full breakdown:
+
+### Event timeline
+
+Every LLM call, tool call, and error in order. Each event shows:
+
+- Step number
+- Event type (LLM call, tool call, error, session start/end)
+- Input and output (truncated for display)
+- Timestamp
+
+### Classification
+
+If a failure was detected, the classification is shown with:
+
+- Category (e.g., Hallucination, Cost anomaly)
+- Subcategory
+- Severity
+- Reason: a plain-language explanation of why the failure was classified this way
+
+### Inspector results
+
+If any inspectors were run on this session, their results are shown here. Each inspector result includes the pass/fail verdict, score, and explanation.
+
+## Filtering sessions
+
+Use the filter bar at the top of the Sessions page to filter by:
+
+- Agent
+- Status
+- Failure type
+- Date range
+
+## Session retention
+
+Sessions and their events are stored indefinitely unless you delete them manually.

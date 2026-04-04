@@ -1,0 +1,72 @@
+# Quickstart
+
+Get Veil running in your agent in under 2 minutes.
+
+## Step 1: Install the SDK
+
+```bash
+pip install veil-sdk
+```
+
+## Step 2: Get your API key
+
+Go to your [Veil dashboard](https://veil.dev/dashboard/settings), open Settings, and copy your API key. Keys look like `vl_` followed by 64 characters.
+
+## Step 3: Add one line to your agent
+
+```python
+import veil
+veil.init(api_key="vl_your_key_here")
+
+# Your agent code continues unchanged below
+```
+
+Call `veil.init()` once, at the top of your script, before any LLM calls. That is all the setup required.
+
+## Step 4: Name your agent (recommended)
+
+If you run multiple agents, give each one a name so they show up clearly in the dashboard:
+
+```python
+import veil
+veil.init(api_key="vl_your_key_here", agent_name="Sales Outreach Agent")
+```
+
+## Full working example
+
+```python
+import veil
+from openai import OpenAI
+
+veil.init(api_key="vl_your_key_here", agent_name="Support Agent")
+
+client = OpenAI()
+
+def run_agent(user_message: str):
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": "You are a helpful support agent."},
+            {"role": "user", "content": user_message},
+        ],
+    )
+    return response.choices[0].message.content
+
+result = run_agent("How do I reset my password?")
+print(result)
+```
+
+Veil automatically captures the LLM call, tracks the session, and closes it when the script exits. You will see this session in your dashboard within seconds.
+
+## What happens next
+
+- Your agent appears in the **Agents** tab
+- Each run creates a **Session** with a full event timeline
+- If a failure is detected, it gets **classified** automatically
+- You receive an **alert** via Slack or email (if configured)
+
+import { Callout } from "nextra/components";
+
+<Callout type="info">
+  Veil works with OpenAI, Anthropic, LangChain, LlamaIndex, and dozens of other LLM libraries. No extra configuration needed for any of them.
+</Callout>

@@ -74,7 +74,7 @@ export function presentSession(s: Session & { agent?: { name?: string } | null }
       : null,
     cost: Number(s.cost ?? 0),
     durationMs,
-    startedAt: String(s.started_at),
+    startedAt: s.started_at ? String(s.started_at) : new Date(0).toISOString(),
     completedAt: s.completed_at ? String(s.completed_at) : null,
   };
 }

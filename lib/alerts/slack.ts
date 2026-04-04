@@ -16,7 +16,7 @@ const SEVERITY_EMOJI: Record<string, string> = {
 const CIRCUIT_KEY = "slack";
 
 // No # prefix — Composio strips it but docs say don't include it
-const SLACK_CHANNEL = process.env.SLACK_ALERT_CHANNEL ?? "viell-alerts";
+const SLACK_CHANNEL = process.env.SLACK_ALERT_CHANNEL ?? "veil-alerts";
 
 export async function sendSlackAlert(params: {
   org: Organization;
@@ -27,7 +27,7 @@ export async function sendSlackAlert(params: {
 
   const composioApiKey = process.env.COMPOSIO_API_KEY;
   if (!composioApiKey) {
-    logger.warn("[alerts/slack] COMPOSIO_API_KEY not set — Slack alerts disabled", {
+    logger.error("[alerts/slack] COMPOSIO_API_KEY not set — Slack alerts disabled", {
       orgId: org.id,
       sessionId,
     });

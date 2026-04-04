@@ -12,6 +12,8 @@ import {
   TrendingUp,
   Wrench,
   ShieldAlert,
+  FlaskConical,
+  LogOut,
 } from "lucide-react";
 import {
   Sidebar,
@@ -25,7 +27,7 @@ import {
   SidebarMenuItem,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { UserButton } from "@clerk/nextjs";
+import { UserButton, useClerk } from "@clerk/nextjs";
 
 const navItems = [
   { title: "Overview", href: "/dashboard", icon: LayoutDashboard },
@@ -33,6 +35,7 @@ const navItems = [
   { title: "Sessions", href: "/dashboard/sessions", icon: ScrollText },
   { title: "Alerts", href: "/dashboard/alerts", icon: Bell },
   { title: "Patterns", href: "/dashboard/patterns", icon: TrendingUp },
+  { title: "Inspectors", href: "/dashboard/inspectors", icon: FlaskConical },
   { title: "Fixes", href: "/dashboard/fixes", icon: Wrench },
   { title: "Cost", href: "/dashboard/cost", icon: DollarSign },
   { title: "Errors", href: "/dashboard/errors", icon: ShieldAlert },
@@ -41,6 +44,7 @@ const navItems = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { signOut } = useClerk();
 
   return (
     <Sidebar>
@@ -78,9 +82,18 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border p-4">
-        <div className="flex items-center gap-3">
-          <UserButton afterSignOutUrl="/" />
-          <span className="text-sm text-muted-foreground">Account</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <UserButton afterSignOutUrl="/" />
+            <span className="text-sm text-muted-foreground">Account</span>
+          </div>
+          <button
+            onClick={() => signOut({ redirectUrl: "/" })}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            Sign out
+          </button>
         </div>
       </SidebarFooter>
     </Sidebar>

@@ -1,6 +1,6 @@
-// Metrics ingest — accept and discard (not used by Veil yet)
+// Metrics ingest — not yet implemented
 import { NextResponse } from "next/server";
 
 export async function POST() {
-  return NextResponse.json({ status: "ok" });
+  return NextResponse.json({ error: "Metrics ingest not yet supported" }, { status: 501 });
 }

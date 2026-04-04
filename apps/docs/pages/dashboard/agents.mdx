@@ -1,0 +1,30 @@
+# Agents
+
+The Agents page lists every AI agent that has sent telemetry to your Veil account.
+
+## Agent list
+
+Each row in the agent list shows:
+
+- **Health indicator**: green (healthy), yellow (warning), red (critical) based on the last session
+- **Agent name**: the `agent_name` you passed to `veil.init()`
+- **Session count**: total number of sessions ever recorded
+- **Failure count**: number of sessions that ended in a failure
+- **Last status**: status of the most recent session
+
+## Agent detail page
+
+Click any agent to see its full detail page. This includes:
+
+- **Session history**: all sessions for this agent, newest first
+- **Health trend**: pass/fail pattern over recent sessions
+- **Classification breakdown**: which failure types are most common
+- **Recent events**: the last few events across sessions
+
+## When agents appear
+
+Agents are created automatically the first time a session is received with a given `agent_name`. You do not need to register agents manually.
+
+## Renaming agents
+
+Agent names come from the `agent_name` parameter in `veil.init()`. To rename an agent, update the parameter in your code. The old name remains in history. New sessions will appear under the new name.

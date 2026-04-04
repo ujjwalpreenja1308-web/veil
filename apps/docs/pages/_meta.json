@@ -1,0 +1,10 @@
+{
+  "index": "Welcome",
+  "quickstart": "Quickstart",
+  "installation": "Installation",
+  "concepts": "Core Concepts",
+  "sdk": "SDK Reference",
+  "dashboard": "Dashboard",
+  "integrations": "Integrations",
+  "api": "API Reference"
+}

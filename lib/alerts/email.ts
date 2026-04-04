@@ -91,7 +91,7 @@ export async function sendFailureAlert(params: {
 
   const resendApiKey = process.env.RESEND_API_KEY;
   if (!resendApiKey) {
-    logger.warn("[alerts/email] RESEND_API_KEY not set — email alerts disabled", {
+    logger.error("[alerts/email] RESEND_API_KEY not set — email alerts disabled", {
       orgId: org.id,
       sessionId,
     });
@@ -167,7 +167,7 @@ export async function sendFailureAlert(params: {
       sessionId,
       category: result.category,
       severity: result.severity,
-      to: toEmail,
+      to: toEmail.replace(/(?<=.).*(?=@)/, "***"),
     });
   } catch (err) {
     recordFailure(CIRCUIT_KEY);
@@ -175,7 +175,7 @@ export async function sendFailureAlert(params: {
       orgId: org.id,
       sessionId,
       category: result.category,
-      to: toEmail,
+      to: toEmail.replace(/(?<=.).*(?=@)/, "***"),
     });
   }
 }

@@ -1,0 +1,83 @@
+# Python SDK
+
+## Installation
+
+```bash
+pip install veil-sdk
+```
+
+## veil.init()
+
+The only function you need to call.
+
+```python
+veil.init(
+    api_key="vl_xxx",
+    agent_name="My Agent",   # optional
+    endpoint="https://veil.dev",  # optional
+)
+```
+
+### Parameters
+
+**`api_key`** `str` (required)
+
+Your Veil API key. Must start with `vl_`. Get it from [dashboard settings](https://veil.dev/dashboard/settings).
+
+```python
+veil.init(api_key="vl_0b2a5f...")
+```
+
+---
+
+**`agent_name`** `str` (optional, default `"default"`)
+
+A human-readable name for this agent. Shown in the dashboard to identify which agent a session belongs to.
+
+```python
+veil.init(api_key="vl_xxx", agent_name="Invoice Processing Agent")
+```
+
+Use descriptive names. If you run the same agent in multiple environments, consider including the environment:
+
+```python
+veil.init(api_key="vl_xxx", agent_name="Support Agent (prod)")
+```
+
+---
+
+**`endpoint`** `str` (optional, default `"https://veil.dev"`)
+
+Override the ingest URL. Only needed if you are self-hosting Veil.
+
+```python
+veil.init(api_key="vl_xxx", endpoint="https://veil.your-company.com")
+```
+
+---
+
+## Behavior
+
+- `veil.init()` is idempotent. Calling it more than once emits a warning and has no effect
+- Telemetry is sent asynchronously and never blocks agent execution
+- A session is automatically closed when the Python process exits
+- If the process crashes, the session is timed out after 1 hour
+
+## Error handling
+
+`veil.init()` raises `ValueError` if the API key is missing or does not start with `vl_`:
+
+```python
+try:
+    veil.init(api_key="invalid")
+except ValueError as e:
+    print(e)
+# Invalid Veil API key: must start with 'vl_'
+```
+
+All other errors (network failures, ingest errors) are silently swallowed. Veil will never crash your agent.
+
+## Requirements
+
+- Python 3.9 or higher
+- Works in any environment: scripts, web servers, notebooks, containers

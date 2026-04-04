@@ -1,0 +1,41 @@
+# Slack
+
+Connect Slack to receive failure alerts directly in your channel.
+
+## Setup
+
+1. Go to **Settings** in your Veil dashboard
+2. Click **Connect Slack**
+3. Authorize Veil in the Slack OAuth flow (this adds the Veil bot to your workspace)
+4. Invite the Veil bot to any channel you want alerts in: `/invite @Veil`
+5. That is it
+
+You will see a welcome message in your channel confirming the connection.
+
+## What you receive
+
+When a session fails, Veil sends a Slack message with:
+
+- The failure category and severity
+- A plain-language reason for the failure
+- A direct link to the session in the dashboard
+
+## Changing the alert channel
+
+Invite the Veil bot to a different channel with `/invite @Veil` and remove it from the old one. Alerts follow the bot.
+
+## Disconnecting
+
+To remove the Slack integration, go to **Settings** and click **Disconnect** next to the Slack section. Alerts stop immediately.
+
+## Troubleshooting
+
+**No messages arriving**
+
+- Check that the Slack connection shows as active in Settings
+- Make sure you invited the Veil bot to your channel with `/invite @Veil`
+- Check that your agent is actually triggering failures by looking at the Sessions page
+
+**Messages going to the wrong channel**
+
+Invite the Veil bot to the correct channel and remove it from the old one.

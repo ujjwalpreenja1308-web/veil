@@ -15,7 +15,18 @@ import {
   insertClassification,
   getEventsBySession,
   getSessionById,
+  getSessionEventCount,
 } from "@/lib/db/queries";
+import { toSessionUuid } from "@/lib/utils";
+
+// Returns the next step number for a session (used when client omits step)
+async function getNextStep(orgId: string, sessionId: string): Promise<number> {
+  try {
+    return (await getSessionEventCount(orgId, sessionId)) + 1;
+  } catch {
+    return 1;
+  }
+}
 
 export async function POST(req: NextRequest) {
   const apiKey =
@@ -63,13 +74,17 @@ export async function POST(req: NextRequest) {
     event = normalize(body);
   } catch (err) {
     logger.exception("[ingest] Failed to normalize payload", err, { orgId: org.id });
+    const status = (err as { status?: number }).status ?? 422;
     return NextResponse.json(
-      { error: "Failed to normalize payload", detail: String(err) },
-      { status: 422 }
+      { error: "Failed to normalize payload", detail: (err as Error).message },
+      { status }
     );
   }
 
   const orgId = org.id;
+
+  // Normalise client session_id → stable UUID (sessions.id is uuid type)
+  event.sessionId = toSessionUuid(orgId, event.sessionId);
 
   try {
     const agentName = String(
@@ -95,13 +110,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Auto-increment step if client sent 0 or omitted it (prevents timeline ordering issues)
+    const step = event.step > 0
+      ? event.step
+      : await getNextStep(orgId, session.id);
+
     try {
-      await insertEvent(orgId, session.id, event.step, event.type, event.payload, event.timestamp);
+      await insertEvent(orgId, session.id, step, event.type, event.payload, event.timestamp);
     } catch (err) {
       logger.exception("[ingest] Failed to insert event", err, {
         orgId,
         sessionId: session.id,
-        step: event.step,
+        step,
         type: event.type,
       });
       throw err;
@@ -119,7 +139,9 @@ export async function POST(req: NextRequest) {
         throw err;
       }
 
-      const result = classify(allEvents);
+      const results = classify(allEvents);
+      // Primary result drives session status (worst severity is first after sort)
+      const primaryResult = results[0] ?? null;
 
       const totalCost = allEvents.reduce(
         (sum, e) => sum + Number(e.payload["gen_ai.usage.cost"] ?? e.payload.cost ?? 0),
@@ -132,8 +154,8 @@ export async function POST(req: NextRequest) {
 
       try {
         await completeSession(orgId, session.id, {
-          status: result ? "failed" : "completed",
-          failure_type: result?.category ?? null,
+          status: primaryResult ? "failed" : "completed",
+          failure_type: primaryResult?.category ?? null,
           cost: totalCost,
           duration_ms: Math.round(durationMs),
         });
@@ -142,29 +164,33 @@ export async function POST(req: NextRequest) {
         throw err;
       }
 
-      if (result) {
+      if (results.length > 0) {
         try {
-          await insertClassification(
-            session.id,
-            result.category,
-            result.subcategory,
-            result.severity,
-            result.reason
-          );
-          logger.info("[ingest] Classification inserted", {
+          // Insert all classifications (one row per detected failure)
+          for (const result of results) {
+            await insertClassification(
+              orgId,
+              session.id,
+              result.category,
+              result.subcategory,
+              result.severity,
+              result.reason
+            );
+          }
+          logger.info("[ingest] Classifications inserted", {
             orgId,
             sessionId: session.id,
-            category: result.category,
-            severity: result.severity,
+            count: results.length,
+            primary: primaryResult?.category,
+            severity: primaryResult?.severity,
           });
-          // Fire-and-forget alerts — never block the ingest response
-          void sendFailureAlert({ org, sessionId: session.id, result });
-          void sendSlackAlert({ org, sessionId: session.id, result });
+          // Alert on the primary (worst) failure only
+          void sendFailureAlert({ org, sessionId: session.id, result: primaryResult! });
+          void sendSlackAlert({ org, sessionId: session.id, result: primaryResult! });
         } catch (err) {
-          logger.exception("[ingest] Failed to insert classification", err, {
+          logger.exception("[ingest] Failed to insert classifications", err, {
             orgId,
             sessionId: session.id,
-            category: result.category,
           });
           throw err;
         }
@@ -173,7 +199,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ status: "ok", session_id: session.id });
+    return NextResponse.json({
+      status: "ok",
+      session_id: session.id,
+      // Explicitly echo back for session.start so webhook clients can confirm
+      ...(event.type === "session.start" && { started: true }),
+    });
   } catch (err) {
     logger.exception("[ingest] Unhandled error", err, { orgId });
     reportError({

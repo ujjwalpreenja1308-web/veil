@@ -1,0 +1,37 @@
+# Cost
+
+The Cost page shows your LLM spend broken down by agent and time period.
+
+## Cost chart
+
+A daily bar chart shows total spend over the last 30 days. Hover over any bar to see the exact amount for that day.
+
+## Cost by agent
+
+Below the chart, each agent shows its cumulative cost for the selected period. Use this to identify which agents are the most expensive to run.
+
+## How cost is calculated
+
+Cost is computed from the token counts and model pricing reported by your LLM provider. For each LLM call:
+
+```
+cost = (prompt_tokens / 1000 * input_price) + (completion_tokens / 1000 * output_price)
+```
+
+Costs are aggregated at the session level and then at the agent level.
+
+## Cost anomaly alerts
+
+If a single session costs more than $1.00, Veil classifies it as a **Cost anomaly** with high severity. Sessions over $5.00 are classified as critical.
+
+You will receive an alert immediately when a cost anomaly is detected.
+
+## Reducing cost
+
+Common causes of unexpected cost:
+
+- **Infinite loops**: the agent keeps calling the same LLM API repeatedly
+- **Oversized prompts**: the system prompt or context window is growing unboundedly
+- **Wrong model selection**: using a large model for a task that a smaller one can handle
+
+Check the [Patterns](/dashboard/patterns) page to see if cost anomalies are recurring.

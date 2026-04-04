@@ -35,7 +35,7 @@ export function useRealtimeDashboard(orgId: string | undefined) {
       )
       .subscribe();
 
-    // Classifications: new failures detected
+    // Classifications: new failures detected (filtered via joined sessions view)
     const classificationsSub = supabase
       .channel(`classifications:${orgId}`)
       .on(
@@ -43,7 +43,8 @@ export function useRealtimeDashboard(orgId: string | undefined) {
         {
           event: "INSERT",
           schema: "public",
-          table: "classifications",
+          table: "sessions",
+          filter: `org_id=eq.${orgId}`,
         },
         () => {
           queryClient.invalidateQueries({ queryKey: ["classifications"] });

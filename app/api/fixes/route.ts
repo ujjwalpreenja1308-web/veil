@@ -1,21 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { getFixesByOrg, createFix, getFixImpact } from "@/lib/db/queries";
-import { getOrgByClerkUser } from "@/lib/db/clerk";
-import { withApiHandler, withTimeout, withRetry } from "@/lib/api-handler";
+import { getOrgId } from "@/lib/db/clerk";
+import { withApiHandler, withRetry } from "@/lib/api-handler";
 
 export const GET = withApiHandler(async (_req: NextRequest) => {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const org = await withTimeout(() => getOrgByClerkUser(userId), 5_000, "getOrgByClerkUser");
-  if (!org) return NextResponse.json({ error: "Organization not found" }, { status: 404 });
+  const orgId = await getOrgId(userId);
+  if (!orgId) return NextResponse.json({ error: "Organization not found" }, { status: 404 });
 
-  const fixes = await withRetry(() => getFixesByOrg(org.id), { label: "getFixesByOrg" });
+  const fixes = await withRetry(() => getFixesByOrg(orgId), { label: "getFixesByOrg" });
 
-  // Fetch impact for all fixes in parallel
+  // Fetch impact for all fixes in parallel — pass fix object to avoid redundant re-fetch
   const impacts = await Promise.all(
-    fixes.map((f) => getFixImpact(org.id, f.id).catch(() => null))
+    fixes.map((f) => getFixImpact(orgId, f).catch(() => null))
   );
 
   return NextResponse.json({
@@ -27,8 +27,8 @@ export const POST = withApiHandler(async (req: NextRequest) => {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const org = await withTimeout(() => getOrgByClerkUser(userId), 5_000, "getOrgByClerkUser");
-  if (!org) return NextResponse.json({ error: "Organization not found" }, { status: 404 });
+  const orgId = await getOrgId(userId);
+  if (!orgId) return NextResponse.json({ error: "Organization not found" }, { status: 404 });
 
   let body: { agent_id?: string; category: string; description: string; applied_at?: string };
   try {
@@ -41,7 +41,7 @@ export const POST = withApiHandler(async (req: NextRequest) => {
     return NextResponse.json({ error: "category and description are required" }, { status: 400 });
   }
 
-  const fix = await createFix(org.id, {
+  const fix = await createFix(orgId, {
     agent_id: body.agent_id,
     category: body.category,
     description: body.description.trim(),

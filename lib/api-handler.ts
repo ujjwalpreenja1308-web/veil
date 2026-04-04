@@ -1,4 +1,19 @@
 // Shared API route utilities — consistent error handling, timeout, retry
+//
+// ROUTE WRAPPER POLICY
+// ─────────────────────────────────────────────────────────────────────────────
+// withApiHandler:  Used by all standard authenticated routes (agents, sessions,
+//                  classifications, fixes, inspectors, patterns, stats, etc.)
+//
+// Deliberately NOT used by:
+//   /api/health          — public ping, no auth, zero overhead
+//   /api/ingest          — SDK hot path; has its own error handling + reportError
+//   /api/ingest/otlp*    — OTLP hot path; same reason
+//   /api/me              — provisioning bootstrap; must not swallow 401 state
+//   /api/keys            — needs full org object (uses getOrgByClerkUser)
+//   /api/integrations/*  — webhook-style, custom auth pattern
+//   /api/webhooks/clerk  — Svix signature verification, cannot wrap
+//   /api/cron/*          — Bearer token auth, not Clerk session
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { reportError } from "@/lib/error-reporter";

@@ -1,0 +1,59 @@
+# Failure Classification
+
+Veil automatically classifies failures at the end of every session. The classification engine analyzes all captured events and assigns a category, subcategory, severity, and reason.
+
+## Failure categories
+
+| Category | Description | Severity |
+|----------|-------------|----------|
+| **Context exhaustion** | Agent ran out of context window before completing the task | High |
+| **RAG failure** | Retrieval returned empty, irrelevant, or low-quality results | Medium |
+| **Cost anomaly** | Session cost exceeded expected thresholds | Low to Critical |
+| **Tool failure** | A tool or function call returned an error or unexpected result | Medium to High |
+| **Infinite loop** | The same tool or action was called 5 or more times in sequence | High |
+| **Goal drift** | Agent deviated from its original task or objective | Medium |
+| **Prompt injection** | User input attempted to override system instructions | Critical |
+| **Hallucination** | Agent produced fabricated or unsupported information | High |
+| **Latency spike** | A single step took longer than expected | Low to High |
+| **Silent failure** | Session completed but produced no meaningful output | Medium |
+
+## Severity levels
+
+| Severity | Meaning |
+|----------|---------|
+| `low` | Worth tracking but not urgent |
+| `medium` | Investigate when you have time |
+| `high` | Investigate soon, user experience impacted |
+| `critical` | Investigate immediately |
+
+## Cost thresholds
+
+Cost anomalies are triggered based on the total cost of a session:
+
+- Over **$1.00** per session: `high` severity
+- Over **$5.00** per session: `critical` severity
+
+## Latency thresholds
+
+Latency spikes are triggered based on the duration of a single LLM call within a session:
+
+- Over **10 seconds**: `high` severity
+- Over **30 seconds**: `critical` severity
+
+## Loop detection
+
+Infinite loops are detected when the same tool or function is called 5 or more times consecutively within a session.
+
+## How classification works
+
+1. The session closes (agent exits or sends a `session.end` event)
+2. All events for the session are loaded
+3. The classification engine runs each rule against the events in priority order
+4. The first matching rule wins and its result is stored
+5. If a failure is found, an alert is sent
+
+import { Callout } from "nextra/components";
+
+<Callout type="info">
+  Only one failure category is assigned per session. The engine stops at the first match using priority ordering. If you need more granular quality checks, use [Inspectors](/concepts/inspectors).
+</Callout>
