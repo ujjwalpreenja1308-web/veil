@@ -84,7 +84,7 @@ export function AppSidebar() {
 
       <SidebarFooter className="border-t border-sidebar-border p-4 space-y-3">
         <a
-          href="https://docs.veil.dev"
+          href={process.env.NEXT_PUBLIC_DOCS_URL ?? "https://docs.veil.dev"}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors"

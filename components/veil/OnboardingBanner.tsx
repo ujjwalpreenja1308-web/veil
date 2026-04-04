@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Circle, ChevronRight, X } from "lucide-react";
+import { CheckCircle2, Circle, ChevronRight, X, BookOpen } from "lucide-react";
 import Link from "next/link";
 
 interface Step {
@@ -27,13 +27,15 @@ export function OnboardingBanner({ hasAgents, hasSessions, slackConnected }: Onb
     return localStorage.getItem("veil_onboarding_dismissed") === "1";
   });
 
+  const isBlankSlate = !hasAgents && !hasSessions && !slackConnected;
+
   const steps: Step[] = [
     {
       id: "install",
       label: "Install the SDK",
       description: "pip install veil-sdk",
       done: hasAgents, // proxy: if agents exist, SDK was used
-      action: { label: "View quickstart", href: "/dashboard/settings" },
+      action: { label: "View quickstart", href: `${process.env.NEXT_PUBLIC_DOCS_URL ?? "https://docs.veil.dev"}/quickstart` },
     },
     {
       id: "first_session",
@@ -74,6 +76,26 @@ export function OnboardingBanner({ hasAgents, hasSessions, slackConnected }: Onb
             <X className="h-3.5 w-3.5" />
           </Button>
         </div>
+
+        {isBlankSlate && (
+          <a
+            href={process.env.NEXT_PUBLIC_DOCS_URL ?? "https://docs.veil.dev"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 rounded-lg border border-primary/20 bg-background px-4 py-3 mb-4 hover:bg-muted/50 transition-colors group"
+          >
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10">
+              <BookOpen className="h-4 w-4 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium">New here? Start with the docs</p>
+              <p className="text-xs text-muted-foreground">
+                Learn how to connect your first agent in under 2 minutes.
+              </p>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
+          </a>
+        )}
 
         <div className="space-y-2">
           {steps.map((step) => (

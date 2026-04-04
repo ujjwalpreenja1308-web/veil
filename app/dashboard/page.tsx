@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { HealthIndicator } from "@/components/veil/HealthIndicator";
 import { AgentStatusBadge } from "@/components/veil/AgentStatusBadge";
-import { Bot, ScrollText, AlertTriangle, DollarSign, Loader2 } from "lucide-react";
+import { Bot, ScrollText, AlertTriangle, DollarSign, Loader2, BookOpen } from "lucide-react";
 import { useOverviewStats } from "@/hooks/use-stats";
 import { useAgents, usePrefetchAgent } from "@/hooks/use-agents";
 import { usePatterns } from "@/hooks/use-patterns";
@@ -133,17 +133,29 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : !agents?.length ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-              <Bot className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-medium mb-2">No agents yet</h3>
-              <p className="text-sm text-muted-foreground max-w-sm">
-                Add{" "}
-                <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">
-                  veil.init()
-                </code>{" "}
-                to your agent and it will appear here automatically.
-              </p>
+          <Card className="border-dashed">
+            <CardContent className="flex flex-col items-center justify-center py-16 text-center gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+                <Bot className="h-7 w-7 text-muted-foreground/60" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-semibold">No agents connected yet</h3>
+                <p className="text-sm text-muted-foreground max-w-xs">
+                  Add one line to your agent and it will appear here automatically.
+                </p>
+              </div>
+              <code className="rounded-md bg-muted px-3 py-2 text-sm font-mono text-foreground">
+                veil.init(api_key=&quot;vl_xxx&quot;)
+              </code>
+              <a
+                href={`${process.env.NEXT_PUBLIC_DOCS_URL ?? "https://docs.veil.dev"}/quickstart`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline underline-offset-4"
+              >
+                <BookOpen className="h-3.5 w-3.5" />
+                Read the quickstart guide
+              </a>
             </CardContent>
           </Card>
         ) : (
