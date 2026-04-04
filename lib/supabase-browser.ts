@@ -1,7 +1,7 @@
 // Browser-safe Supabase client — uses anon key, suitable for Realtime subscriptions
 // Only used client-side. Server code must use lib/supabase.ts (service role).
 import { createClient } from "@supabase/supabase-js";
-import { clientEnv } from "@/lib/env";
+import { clientEnv } from "@/lib/env.client";
 
 const supabaseUrl = clientEnv.SUPABASE_URL;
 const supabaseAnonKey = clientEnv.SUPABASE_ANON_KEY;

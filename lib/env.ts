@@ -1,6 +1,8 @@
-// Centralized environment variable validation.
-// Import this module to trigger validation at startup — missing required vars
-// will throw immediately with a clear message rather than failing on first use.
+// Server-only environment variable validation.
+// NEVER import this file in client components or files that may be bundled for the browser.
+// For client-safe vars, use @/lib/env.client instead.
+//
+// Import this file in instrumentation.ts to validate all server vars at cold start.
 
 function requireEnv(name: string): string {
   const val = process.env[name];
@@ -12,9 +14,6 @@ function optionalEnv(name: string): string | undefined {
   return process.env[name] || undefined;
 }
 
-// ── Server-only vars ──────────────────────────────────────────────────────────
-// These are validated at module load time. Import this file in instrumentation.ts
-// to fail fast on cold start rather than on first request.
 export const serverEnv = {
   SUPABASE_URL: requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
   SUPABASE_SERVICE_ROLE_KEY: requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
@@ -28,11 +27,4 @@ export const serverEnv = {
   INSPECTOR_SERVICE_URL: optionalEnv("INSPECTOR_SERVICE_URL"),
   INSPECTOR_API_KEY: optionalEnv("INSPECTOR_API_KEY"),
   CRON_SECRET: requireEnv("CRON_SECRET"),
-} as const;
-
-// ── Client-safe vars ──────────────────────────────────────────────────────────
-// Safe to access in browser bundles (NEXT_PUBLIC_ prefix).
-export const clientEnv = {
-  SUPABASE_URL: requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
-  SUPABASE_ANON_KEY: requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
 } as const;
