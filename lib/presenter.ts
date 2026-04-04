@@ -19,6 +19,8 @@ export interface UIEvent {
   completionTokens: number | null;
   cost: number | null;
   error: string | null;
+  prompt: string | null;
+  completion: string | null;
 }
 
 export function presentEvent(e: Event): UIEvent {
@@ -37,6 +39,8 @@ export function presentEvent(e: Event): UIEvent {
     completionTokens: numOrNull(p["gen_ai.usage.completion_tokens"] ?? p["llm.usage.completion_tokens"]),
     cost: numOrNull(p["gen_ai.usage.cost"] ?? p.cost),
     error: strOrNull(p["gen_ai.error.message"] ?? p.error_message ?? p.error),
+    prompt: strOrNull(p["gen_ai.prompt"] ?? p.input ?? p.prompt),
+    completion: strOrNull(p["gen_ai.completion"] ?? p.output ?? p.completion),
   };
 }
 

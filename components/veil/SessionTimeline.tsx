@@ -1,9 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type { UIEvent } from "@/lib/presenter";
 import { format } from "date-fns";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 const typeColors: Record<string, string> = {
   "LLM Call": "bg-purple-500",
@@ -18,6 +21,47 @@ const typeColors: Record<string, string> = {
 
 interface SessionTimelineProps {
   events: UIEvent[];
+}
+
+function PromptReader({ prompt, completion }: { prompt: string | null; completion: string | null }) {
+  const [open, setOpen] = useState(false);
+
+  if (!prompt && !completion) return null;
+
+  return (
+    <div className="mt-2 border-t pt-2">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-6 px-2 text-xs text-muted-foreground gap-1"
+        onClick={() => setOpen((v) => !v)}
+      >
+        {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+        {open ? "Hide" : "Show"} prompt
+      </Button>
+
+      {open && (
+        <div className="mt-2 space-y-2">
+          {prompt && (
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Prompt</p>
+              <pre className="text-xs bg-muted rounded-md p-3 whitespace-pre-wrap break-words max-h-64 overflow-y-auto font-mono leading-relaxed">
+                {prompt}
+              </pre>
+            </div>
+          )}
+          {completion && (
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Completion</p>
+              <pre className="text-xs bg-muted rounded-md p-3 whitespace-pre-wrap break-words max-h-64 overflow-y-auto font-mono leading-relaxed">
+                {completion}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function SessionTimeline({ events }: SessionTimelineProps) {
@@ -67,6 +111,8 @@ export function SessionTimeline({ events }: SessionTimelineProps) {
                     <p className="text-red-500">Error: {event.error}</p>
                   )}
                 </div>
+
+                <PromptReader prompt={event.prompt} completion={event.completion} />
               </CardContent>
             </Card>
           </div>
