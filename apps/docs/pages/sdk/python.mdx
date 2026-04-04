@@ -56,12 +56,69 @@ veil.init(api_key="vl_xxx", endpoint="https://veil.your-company.com")
 
 ---
 
+## veil.flush()
+
+Flushes all pending telemetry and closes the current session immediately.
+
+```python
+veil.flush()
+```
+
+### When you need it
+
+In a normal long-running process — a server, a script, a container — Veil automatically sends everything when the process exits. You don't need to call `flush()`.
+
+In **serverless functions**, the process doesn't exit cleanly. The moment your handler returns, the platform freezes or kills the process. Any telemetry still buffered in memory is dropped, and the session never closes in your dashboard.
+
+`flush()` forces delivery before that happens:
+
+```python
+import veil
+
+veil.init(api_key="vl_xxx", agent_name="My Lambda")
+
+def handler(event, context):
+    result = run_agent(event)
+
+    veil.flush()  # send everything before Lambda freezes
+    return result
+```
+
+### What it does
+
+Two things, in order:
+
+1. Calls `force_flush()` on the OpenTelemetry tracer provider — drains any LLM call spans still buffered in memory
+2. Sends a `session.end` event to Veil — closes the session and triggers failure classification
+
+### Where you need it
+
+| Platform | Reason |
+|---|---|
+| AWS Lambda | Process frozen immediately after handler returns |
+| Google Cloud Functions | Same — execution context suspended |
+| Vercel / Netlify Functions | Execution context torn down after response |
+| Azure Functions (Consumption) | Process frozen after invocation |
+
+### Where it's optional
+
+Servers (FastAPI, Flask), scripts, notebooks, and containers all exit cleanly — `flush()` is harmless to call but not required.
+
+### Notes
+
+- Safe to call multiple times — only the first call does anything
+- Default timeout is 5 seconds. Override with `veil.flush(timeout=10.0)`
+- Will warn (but not raise) if called before `veil.init()`
+
+---
+
 ## Behavior
 
 - `veil.init()` is idempotent. Calling it more than once emits a warning and has no effect
 - Telemetry is sent asynchronously and never blocks agent execution
-- A session is automatically closed when the Python process exits
-- If the process crashes, the session is timed out after 1 hour
+- A session is automatically closed when the Python process exits (via `atexit`)
+- In serverless functions, call `veil.flush()` before returning — see above
+- If the process is killed without flushing, the session is timed out after 1 hour
 
 ## Error handling
 

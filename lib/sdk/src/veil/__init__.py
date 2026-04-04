@@ -8,19 +8,30 @@ Usage::
     # Optional: name your agent so it shows up correctly in the dashboard
     veil.init(api_key="vl_xxx", agent_name="Sales Agent")
 
+    # In serverless functions, call flush() before the handler returns
+    # to guarantee telemetry is delivered before the process is frozen.
+    veil.flush()
+
 That's it.
 """
 
 from __future__ import annotations
 
 import atexit
+import json
+import sys
+import urllib.request
 import warnings
+from datetime import datetime, timezone
 from typing import Optional
 
-__all__ = ["init"]
+__all__ = ["init", "flush"]
 
 _initialized: bool = False
 _session_id: Optional[str] = None
+_api_key: Optional[str] = None
+_endpoint: Optional[str] = None
+_flushed: bool = False  # guard: flush sends session.end exactly once
 
 
 def init(
@@ -41,7 +52,7 @@ def init(
     endpoint:
         Override the ingest URL. Leave unset unless self-hosting.
     """
-    global _initialized, _session_id  # noqa: PLW0603
+    global _initialized, _session_id, _api_key, _endpoint  # noqa: PLW0603
 
     if _initialized:
         warnings.warn(
@@ -58,21 +69,95 @@ def init(
 
     import uuid
     _session_id = str(uuid.uuid4())
+    _api_key = api_key
+    _endpoint = endpoint.rstrip("/")
 
     _start(
         api_key=api_key,
         agent_name=agent_name,
-        endpoint=endpoint,
+        endpoint=_endpoint,
         session_id=_session_id,
     )
-    atexit.register(
-        _shutdown,
-        api_key=api_key,
-        endpoint=endpoint,
-        session_id=_session_id,
-    )
+    atexit.register(_shutdown)
 
     _initialized = True
+
+
+def flush(timeout: float = 5.0) -> None:
+    """Flush all pending telemetry and close the current session.
+
+    Call this explicitly in serverless functions (AWS Lambda, Google Cloud
+    Functions, Vercel Edge, etc.) before your handler returns, because the
+    process may be frozen or killed before the ``atexit`` hook fires.
+
+    It is safe to call ``flush()`` multiple times — only the first call sends
+    the ``session.end`` event; subsequent calls are no-ops.
+
+    Parameters
+    ----------
+    timeout:
+        Seconds to wait for the HTTP request to complete. Default is 5.
+    """
+    global _flushed  # noqa: PLW0603
+
+    if not _initialized:
+        warnings.warn(
+            "veil.flush() called before veil.init() — nothing to flush.",
+            stacklevel=2,
+        )
+        return
+
+    if _flushed:
+        return
+
+    _flushed = True
+
+    # 1. Force OpenLIT's OTLP span exporter to flush buffered spans.
+    _flush_openlit()
+
+    # 2. Send session.end to close the session in Veil's pipeline.
+    _send_session_end(timeout=timeout)
+
+
+def _flush_openlit() -> None:
+    """Best-effort flush of the OpenTelemetry SDK's span processors."""
+    try:
+        from opentelemetry import trace  # type: ignore[import-untyped]
+        provider = trace.get_tracer_provider()
+        # TracerProvider has force_flush(); ProxyTracerProvider does not.
+        flush_fn = getattr(provider, "force_flush", None)
+        if callable(flush_fn):
+            flush_fn(timeout_millis=4_000)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[veil] OpenTelemetry flush warning: {exc}", file=sys.stderr)
+
+
+def _send_session_end(timeout: float = 5.0) -> None:
+    """HTTP POST session.end to the Veil ingest endpoint."""
+    if not _api_key or not _endpoint or not _session_id:
+        return
+
+    payload = json.dumps({
+        "session_id": _session_id,
+        "step": 0,
+        "type": "session.end",
+        "payload": {},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        _endpoint + "/api/ingest",
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "x-api-key": _api_key,
+        },
+        method="POST",
+    )
+    try:
+        urllib.request.urlopen(req, timeout=timeout)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[veil] session.end flush failed: {exc}", file=sys.stderr)
 
 
 def _start(api_key: str, agent_name: str, endpoint: str, session_id: str) -> None:
@@ -84,7 +169,7 @@ def _start(api_key: str, agent_name: str, endpoint: str, session_id: str) -> Non
             "veil-sdk requires 'openlit'. Install it with: pip install veil-sdk"
         ) from exc
 
-    otlp_endpoint = endpoint.rstrip("/") + "/api/ingest/otlp"
+    otlp_endpoint = endpoint + "/api/ingest/otlp"
 
     openlit.init(
         otlp_endpoint=otlp_endpoint,
@@ -98,31 +183,6 @@ def _start(api_key: str, agent_name: str, endpoint: str, session_id: str) -> Non
     )
 
 
-def _shutdown(api_key: str, endpoint: str, session_id: str) -> None:
-    """Atexit: send a session.end event so the ingest pipeline closes the session."""
-    import json
-    import urllib.request
-    from datetime import datetime, timezone
-
-    payload = json.dumps({
-        "session_id": session_id,
-        "step": 0,
-        "type": "session.end",
-        "payload": {},
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }).encode("utf-8")
-
-    req = urllib.request.Request(
-        endpoint.rstrip("/") + "/api/ingest",
-        data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-        },
-        method="POST",
-    )
-    try:
-        urllib.request.urlopen(req, timeout=5)
-    except Exception as exc:  # noqa: BLE001
-        import sys
-        print(f"[veil] session.end flush failed: {exc}", file=sys.stderr)  # never crash on shutdown
+def _shutdown() -> None:
+    """atexit handler — delegates to flush() so session.end fires exactly once."""
+    flush()
