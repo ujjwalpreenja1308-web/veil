@@ -31,6 +31,36 @@ async def run_inspector_brain(
         }
         for i in trace.issues
     ]
+    # Include failed_steps — provides retry context the issues list may lack
+    for fs in trace.failed_steps:
+        issues_payload.append({
+            "session_id": fs.session_id,
+            "type": "tool_failure",
+            "description": f"Step '{fs.step}' failed: {fs.error}",
+            "severity": "high",
+            "confidence": 0.95,
+            "was_handled": fs.was_handled,
+            "evidence": {
+                "field": fs.evidence.field,
+                "value": fs.evidence.value,
+                "reasoning": fs.evidence.reasoning,
+            },
+        })
+    # Include tool_errors — agent_continued flag is key signal for silent failures
+    for te in trace.tool_errors:
+        issues_payload.append({
+            "session_id": te.session_id,
+            "type": "tool_failure",
+            "description": f"Tool '{te.tool_name}' errored: {te.error}",
+            "severity": "high",
+            "confidence": 0.95,
+            "agent_continued_after_error": te.agent_continued,
+            "evidence": {
+                "field": te.evidence.field,
+                "value": te.evidence.value,
+                "reasoning": te.evidence.reasoning,
+            },
+        })
     # Also include claim mismatches — they're the richest signal for fabrication
     for cm in trace.claim_mismatches:
         issues_payload.append({

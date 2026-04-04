@@ -78,7 +78,7 @@ def _extract_signals_from_events(events: list[dict]) -> dict:
         if output is not None and str(output).strip() in ("", "null", "None", "{}"):
             anomalies.append(f"Empty output at step [{step}]")
 
-        if not error_val and not tool_error if tool_name else not error_val:
+        if not error_val and not (tool_name and tool_error):
             successful_steps += 1
 
     retry_briefs = [
@@ -150,6 +150,8 @@ async def summarize_sessions(
         else:
             status = raw_status
 
+        cost_raw = session.get("cost")
+        duration_raw = session.get("duration_ms")
         session_summaries.append(SessionSummary(
             session_id=sid,
             status=status,
@@ -161,6 +163,9 @@ async def summarize_sessions(
             retries=signals["retries"],
             anomalies=signals["anomalies"],
             outcome=outcome,
+            cost_usd=float(cost_raw) if cost_raw is not None else None,
+            duration_ms=int(duration_raw) if duration_raw is not None else None,
+            failure_type=session.get("failure_type"),
         ))
 
     return SessionDigest(

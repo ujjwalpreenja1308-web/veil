@@ -43,6 +43,9 @@ class SessionSummary(BaseModel):
     retries: list[RetryBrief]
     anomalies: list[str]
     outcome: str                            # 1-sentence result
+    cost_usd: float | None                  # total cost for this session
+    duration_ms: int | None                 # wall-clock duration
+    failure_type: str | None                # classifier label if set
 
 
 class SessionDigest(BaseModel):

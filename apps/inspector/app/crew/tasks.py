@@ -16,7 +16,7 @@ def make_trace_analyst_task(agent, digest_json: str) -> Task:
             "Rules:\n"
             "- Only extract issues that are EXPLICITLY present in the digest\n"
             "- Each issue MUST have an evidence field with: session_id, field, value, reasoning\n"
-            "- field must be one of: errors, tools_failed, failed_steps, retries, anomalies\n"
+            "- field must be one of: errors, tools_failed, failed_steps, retries, anomalies, tool_errors, claim_mismatches\n"
             "- severity: low | medium | high | critical\n"
             "- confidence: 0.0-1.0 (how certain you are based on the signal strength)\n"
             "- type: hallucination | tool_failure | loop | timeout | missing_step | fabrication | other\n"
