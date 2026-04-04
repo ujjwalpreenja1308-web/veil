@@ -50,7 +50,7 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
         <Link href="/dashboard" className="flex items-center gap-2">
-          <span className="text-xl font-bold text-primary">Veil</span>
+          <img src="/logo.svg" alt="Veil" className="h-7 w-auto" />
         </Link>
       </SidebarHeader>
 
