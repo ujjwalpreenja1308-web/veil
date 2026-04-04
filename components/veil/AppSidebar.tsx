@@ -14,6 +14,7 @@ import {
   ShieldAlert,
   FlaskConical,
   LogOut,
+  BookOpen,
 } from "lucide-react";
 import {
   Sidebar,
@@ -81,7 +82,16 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border p-4">
+      <SidebarFooter className="border-t border-sidebar-border p-4 space-y-3">
+        <a
+          href="https://docs.veil.dev"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors"
+        >
+          <BookOpen className="h-4 w-4" />
+          Documentation
+        </a>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <UserButton afterSignOutUrl="/" />
