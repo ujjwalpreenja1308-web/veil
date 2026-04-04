@@ -42,6 +42,11 @@ export function useSession(id: string) {
       const status = query.state.data?.session?.status;
       return status === "running" ? 5_000 : false;
     },
+    // Don't re-hit the server on tab focus for terminal sessions — they won't change
+    refetchOnWindowFocus: (query) => {
+      const status = query.state.data?.session?.status;
+      return status === "running" || status === undefined;
+    },
     staleTime: 10_000,
   });
 }

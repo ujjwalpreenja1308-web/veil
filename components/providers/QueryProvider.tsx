@@ -33,6 +33,11 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
             // Only show toast on background refetch failures (not initial load)
             // so we don't spam on first mount
             if (query.state.data !== undefined) {
+              // Suppress 404s — the resource may have been deleted or is genuinely missing
+              if (error instanceof Error) {
+                const status = parseInt(error.message.match(/API error (\d+)/)?.[1] ?? "0", 10);
+                if (status === 404) return;
+              }
               const msg = error instanceof Error ? error.message : "Failed to refresh data";
               toast.error(`Data refresh failed: ${msg}`, { id: String(query.queryKey[0]) });
             }
