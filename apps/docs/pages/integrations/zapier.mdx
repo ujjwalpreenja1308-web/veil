@@ -1,0 +1,137 @@
+# Zapier
+
+Monitor your Zapier AI automations with Veil. Each Zap run is tracked as a session in your dashboard with full failure classification and alerting.
+
+## How it works
+
+Veil provides a dedicated endpoint for Zapier:
+
+```
+POST https://<your-domain>/api/ingest/zapier
+```
+
+You add a **"Webhooks by Zapier"** action at the end of your Zap to POST execution data. Veil normalizes the flat key-value payload, runs failure classification, and surfaces everything in the dashboard.
+
+## Setup
+
+### 1. Get your API key
+
+Go to **Settings → API Key** in your Veil dashboard and copy your key (`vl_xxx`).
+
+### 2. Add a "Webhooks by Zapier" action
+
+In your Zap, add a new action step at the end:
+
+- **App**: Webhooks by Zapier
+- **Event**: POST
+
+Configure it:
+
+| Field | Value |
+|---|---|
+| URL | `https://<your-domain>/api/ingest/zapier` |
+| Payload Type | `json` |
+| Headers | `X-API-Key`: `vl_xxx` |
+
+### 3. Set the JSON body
+
+Map your Zap's data fields to Veil's schema. The only required fields are `session_id` and `type`. All others are optional enrichment.
+
+```json
+{
+  "session_id": "your-unique-run-id",
+  "type": "llm.call",
+  "agent_name": "My Zapier Agent",
+  "model": "gpt-4o",
+  "input": "The user's prompt here",
+  "output": "The model's response here",
+  "prompt_tokens": 120,
+  "completion_tokens": 340,
+  "cost": 0.0024,
+  "duration_ms": 1850,
+  "status": "success"
+}
+```
+
+Setting `status` to `"success"` or `"error"` tells Veil this is the final event and closes the session automatically.
+
+### 4. For multi-step Zaps
+
+If your Zap has multiple AI steps, send an array of events in a single POST:
+
+```json
+[
+  {
+    "session_id": "run-abc123",
+    "type": "llm.call",
+    "agent_name": "Research Agent",
+    "model": "gpt-4o",
+    "input": "Summarize this article...",
+    "output": "The article covers..."
+  },
+  {
+    "session_id": "run-abc123",
+    "type": "tool.call",
+    "tool_name": "web_search",
+    "duration_ms": 430
+  },
+  {
+    "session_id": "run-abc123",
+    "type": "llm.call",
+    "model": "gpt-4o",
+    "input": "Now write the final answer...",
+    "output": "Based on the research...",
+    "status": "success"
+  }
+]
+```
+
+All events with the same `session_id` are grouped into one session. The last event with `status: "success"` or `status: "error"` closes the session.
+
+### 5. On errors
+
+For failed Zap runs, add a separate error path with:
+
+```json
+{
+  "session_id": "run-abc123",
+  "type": "span",
+  "agent_name": "My Zapier Agent",
+  "error": "Step 2 failed: OpenAI rate limit exceeded",
+  "status": "error"
+}
+```
+
+Veil will classify the failure and trigger any configured alerts.
+
+## Payload field reference
+
+| Field | Required | Description |
+|---|---|---|
+| `session_id` | Yes | Unique identifier for this run (letters, numbers, `-`, `_` only, max 128 chars) |
+| `type` | No | Event type: `llm.call`, `tool.call`, `retrieval`, `span`, `session.end` |
+| `agent_name` | No | Name shown in the Agents page |
+| `model` | No | LLM model used (e.g. `gpt-4o`, `claude-3-5-sonnet`) |
+| `input` / `prompt` | No | The prompt sent to the model |
+| `output` / `completion` | No | The model's response |
+| `prompt_tokens` | No | Input token count |
+| `completion_tokens` | No | Output token count |
+| `cost` | No | Cost in USD for this step |
+| `duration_ms` | No | Step duration in milliseconds |
+| `tool_name` | No | Name of the tool called |
+| `error` | No | Error message if the step failed |
+| `status` | No | `"success"` or `"error"` — closes the session when set |
+| `timestamp` | No | ISO 8601 timestamp (defaults to now) |
+
+## Troubleshooting
+
+**Session not showing in dashboard**
+- Check that `session_id` only uses letters, numbers, hyphens, and underscores
+- Verify the `X-API-Key` header value in your Webhooks action
+- Test the Zap and check the webhook step response for error details
+
+**Session stuck as "running"**
+- Make sure at least one event sends `"status": "success"` or `"status": "error"`, or send a final event with `"type": "session.end"`
+
+**No failures detected despite errors**
+- Send `"error": "your error message"` in the payload — this is what the classification engine reads

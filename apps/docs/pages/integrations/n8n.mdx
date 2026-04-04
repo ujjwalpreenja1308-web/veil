@@ -1,0 +1,105 @@
+# n8n
+
+Monitor your n8n AI workflows with Veil. Every workflow execution is tracked as a session — failures, LLM calls, tool usage, and costs all appear in your dashboard automatically.
+
+## How it works
+
+Veil provides a dedicated endpoint for n8n:
+
+```
+POST https://<your-domain>/api/ingest/n8n
+```
+
+You configure one of two things in your n8n workflow:
+- A **Webhook trigger** that fires when the workflow is called
+- An **HTTP Request node** at the end of the workflow that POSTs execution data to Veil
+
+Veil reads the execution data, maps each node run to an event, classifies failures, and closes the session.
+
+## Setup
+
+### 1. Get your API key
+
+Go to **Settings → API Key** in your Veil dashboard and copy your key (`vl_xxx`).
+
+### 2. Add a Webhook node (recommended)
+
+If your workflow starts with a Webhook trigger, you can use it to also send data back to Veil.
+
+Add an **HTTP Request** node at the end of your workflow:
+
+| Field | Value |
+|---|---|
+| Method | POST |
+| URL | `https://<your-domain>/api/ingest/n8n` |
+| Authentication | Header Auth → `X-API-Key: vl_xxx` |
+| Body Content Type | JSON |
+| Body | See below |
+
+**Body** (enable "Send execution data" in your Webhook trigger settings, then reference fields):
+
+```json
+{
+  "execution": {
+    "id": "{{ $execution.id }}",
+    "workflowId": "{{ $workflow.id }}",
+    "workflowName": "{{ $workflow.name }}",
+    "status": "{{ $execution.status }}",
+    "startedAt": "{{ $execution.startedAt }}",
+    "stoppedAt": "{{ $now.toISO() }}",
+    "mode": "{{ $execution.mode }}"
+  }
+}
+```
+
+### 3. Using the n8n "Execute Workflow" trigger with execution data
+
+If you want full node-level telemetry (each node's timing, outputs, and errors), enable **"Include Execution Data"** in your webhook node settings. Veil will automatically parse each node's run and create a timeline event per node.
+
+### 4. Test it
+
+Run your workflow once and check the **Sessions** page in Veil — you should see a new session appear within seconds.
+
+## What Veil captures automatically
+
+| Source | What Veil reads |
+|---|---|
+| OpenAI / LLM nodes | Model, prompt, completion, token usage |
+| Tool / Code nodes | Execution time, errors |
+| HTTP Request nodes | Duration, errors |
+| Workflow level | Total duration, status, failure reason |
+
+## Error detection
+
+Veil's classification engine runs on every session end. For n8n workflows it detects:
+
+- **Tool failure** — any node that throws an error
+- **Latency spike** — total workflow duration exceeds threshold
+- **Cost anomaly** — LLM token spend above baseline (when OpenAI node data is present)
+- **Infinite loop** — same node pattern repeated more than expected
+
+## Example: AI Agent workflow
+
+```
+[Webhook Trigger]
+       ↓
+[OpenAI Chat Model node]  ← LLM call captured
+       ↓
+[HTTP Request node]       ← tool call captured
+       ↓
+[HTTP Request → Veil]     ← sends execution data to Veil
+```
+
+## Troubleshooting
+
+**Session not appearing in dashboard**
+- Check that the HTTP Request node is the last step and executes even on error (use an Error Workflow or always-execute node)
+- Verify the `X-API-Key` header is set correctly
+- Check n8n execution logs for the HTTP Request node response
+
+**No node-level detail showing**
+- Ensure "Include Execution Data" is enabled in your n8n Webhook trigger
+- Pass the full `execution` object including `data.resultData.runData`
+
+**Status always shows "completed" even on error**
+- Make sure `status` is set to `"error"` in the body for failed runs — reference `{{ $execution.status }}` directly
