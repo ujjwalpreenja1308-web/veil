@@ -106,7 +106,6 @@ def _shutdown(api_key: str, endpoint: str, session_id: str) -> None:
 
     payload = json.dumps({
         "session_id": session_id,
-        "org_id": "",
         "step": 0,
         "type": "session.end",
         "payload": {},
@@ -124,5 +123,6 @@ def _shutdown(api_key: str, endpoint: str, session_id: str) -> None:
     )
     try:
         urllib.request.urlopen(req, timeout=5)
-    except Exception:  # noqa: BLE001
-        pass  # never crash on shutdown
+    except Exception as exc:  # noqa: BLE001
+        import sys
+        print(f"[veil] session.end flush failed: {exc}", file=sys.stderr)  # never crash on shutdown

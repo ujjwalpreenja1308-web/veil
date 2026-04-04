@@ -5,6 +5,7 @@ import { normalizeOtlp } from "@/lib/normalizer";
 import { classify } from "@/lib/rules/engine";
 import { logger } from "@/lib/logger";
 import { checkRateLimit } from "@/lib/ratelimit";
+import { reportError } from "@/lib/error-reporter";
 import { sendFailureAlert } from "@/lib/alerts/email";
 import { sendSlackAlert } from "@/lib/alerts/slack";
 import type { Organization } from "@/lib/db/schema";
@@ -18,6 +19,7 @@ import {
   getEventsBySession,
   getSessionById,
 } from "@/lib/db/queries";
+import { toSessionUuid } from "@/lib/utils";
 
 export async function POST(req: NextRequest) {
   // Auth: x-api-key header, ?api_key= param, or OTLP header format
@@ -102,10 +104,11 @@ export async function POST(req: NextRequest) {
   logger.info("[ingest/otlp] Received spans", { orgId, count: events.length });
 
   try {
-    // Group events by session_id
+    // Group events by session_id, normalising each to a stable UUID
     const bySession = new Map<string, typeof events>();
     for (const event of events) {
-      const sid = event.sessionId || "default";
+      const sid = toSessionUuid(orgId, event.sessionId || "default");
+      event.sessionId = sid;
       if (!bySession.has(sid)) bySession.set(sid, []);
       bySession.get(sid)!.push(event);
     }
@@ -177,6 +180,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ status: "ok", received: events.length });
   } catch (err) {
     logger.exception("[ingest/otlp] Unhandled error", err, { orgId });
+    reportError({
+      route: "/api/ingest/otlp",
+      message: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+      org_id: orgId,
+    });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -192,7 +201,8 @@ async function closeSession(org: Organization, sessionId: string): Promise<void>
     throw err;
   }
 
-  const result = classify(allEvents);
+  const results = classify(allEvents);
+  const primaryResult = results[0] ?? null;
 
   const totalCost = allEvents.reduce(
     (sum, e) => sum + Number(e.payload["gen_ai.usage.cost"] ?? e.payload.cost ?? 0),
@@ -205,15 +215,15 @@ async function closeSession(org: Organization, sessionId: string): Promise<void>
 
   try {
     await completeSession(orgId, sessionId, {
-      status: result ? "failed" : "completed",
-      failure_type: result?.category ?? null,
+      status: primaryResult ? "failed" : "completed",
+      failure_type: primaryResult?.category ?? null,
       cost: totalCost,
       duration_ms: Math.round(durationMs),
     });
     logger.info("[ingest/otlp] Session closed", {
       orgId,
       sessionId,
-      status: result ? "failed" : "completed",
+      status: primaryResult ? "failed" : "completed",
       cost: totalCost,
       durationMs: Math.round(durationMs),
     });
@@ -222,27 +232,30 @@ async function closeSession(org: Organization, sessionId: string): Promise<void>
     throw err;
   }
 
-  if (result) {
+  if (results.length > 0) {
     try {
-      await insertClassification(
-        sessionId,
-        result.category,
-        result.subcategory,
-        result.severity,
-        result.reason
-      );
-      logger.info("[ingest/otlp] Classification inserted", {
+      for (const result of results) {
+        await insertClassification(
+          orgId,
+          sessionId,
+          result.category,
+          result.subcategory,
+          result.severity,
+          result.reason
+        );
+      }
+      logger.info("[ingest/otlp] Classifications inserted", {
         orgId,
         sessionId,
-        category: result.category,
-        severity: result.severity,
-        reason: result.reason,
+        count: results.length,
+        primary: primaryResult?.category,
+        severity: primaryResult?.severity,
       });
-      // Fire-and-forget alerts — never block the ingest response
-      void sendFailureAlert({ org, sessionId, result });
-      void sendSlackAlert({ org, sessionId, result });
+      // Alert on the primary (worst) failure only
+      void sendFailureAlert({ org, sessionId, result: primaryResult! });
+      void sendSlackAlert({ org, sessionId, result: primaryResult! });
     } catch (err) {
-      logger.exception("[ingest/otlp] Failed to insert classification", err, { orgId, sessionId });
+      logger.exception("[ingest/otlp] Failed to insert classifications", err, { orgId, sessionId });
       throw err;
     }
   }

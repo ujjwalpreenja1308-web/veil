@@ -9,6 +9,7 @@ import { SessionTimeline } from "@/components/veil/SessionTimeline";
 import { AlertCard } from "@/components/veil/AlertCard";
 import { SuggestionCard } from "@/components/veil/SuggestionCard";
 import { ArrowLeft, FlaskConical } from "lucide-react";
+import { use } from "react";
 import { useSession } from "@/hooks/use-sessions";
 import { formatDistanceToNow, format } from "date-fns";
 
@@ -18,8 +19,9 @@ const statusVariant: Record<string, "default" | "secondary" | "destructive"> = {
   failed: "destructive",
 };
 
-export default function SessionDetailPage({ params }: { params: { id: string } }) {
-  const { data, isLoading } = useSession(params.id);
+export default function SessionDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const { data, isLoading } = useSession(id);
   if (isLoading) {
     return (
       <div className="space-y-6">

@@ -6,14 +6,15 @@ import { withApiHandler } from "@/lib/api-handler";
 
 export const DELETE = withApiHandler(async (
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) => {
+  const { id } = await params;
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const orgId = await getOrgId(userId);
   if (!orgId) return NextResponse.json({ error: "Organization not found" }, { status: 404 });
 
-  await deleteFix(orgId, params.id);
+  await deleteFix(orgId, id);
   return NextResponse.json({ ok: true });
 });

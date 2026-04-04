@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
 
     // Fire welcome message once after OAuth connect
     if (sendWelcome && slackConn) {
-      const channel = process.env.SLACK_ALERT_CHANNEL ?? "viell-alerts";
+      const channel = process.env.SLACK_ALERT_CHANNEL ?? "veil-alerts";
       void entity.execute({
         actionName: "SLACKBOT_SEND_MESSAGE",
         params: {

@@ -13,9 +13,9 @@ export const GET = withApiHandler(async (_req: NextRequest) => {
 
   const fixes = await withRetry(() => getFixesByOrg(orgId), { label: "getFixesByOrg" });
 
-  // Fetch impact for all fixes in parallel
+  // Fetch impact for all fixes in parallel — pass fix object to avoid redundant re-fetch
   const impacts = await Promise.all(
-    fixes.map((f) => getFixImpact(orgId, f.id).catch(() => null))
+    fixes.map((f) => getFixImpact(orgId, f).catch(() => null))
   );
 
   return NextResponse.json({

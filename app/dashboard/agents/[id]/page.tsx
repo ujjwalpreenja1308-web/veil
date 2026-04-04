@@ -7,12 +7,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AgentStatusBadge } from "@/components/veil/AgentStatusBadge";
 import { FailureTypeTag } from "@/components/veil/FailureTypeTag";
 import { ArrowLeft, Bot } from "lucide-react";
+import { use } from "react";
 import { useAgent } from "@/hooks/use-agents";
 import { usePrefetchSession } from "@/hooks/use-sessions";
 import { formatDistanceToNow } from "date-fns";
 
-export default function AgentDetailPage({ params }: { params: { id: string } }) {
-  const { data, isLoading } = useAgent(params.id);
+export default function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const { data, isLoading } = useAgent(id);
   const prefetchSession = usePrefetchSession();
 
   if (isLoading) {

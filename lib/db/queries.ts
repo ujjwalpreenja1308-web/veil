@@ -26,29 +26,32 @@ export async function createOrg(
   apiKey: string,
   clerkUserId: string
 ): Promise<Organization> {
-  const { data, error } = await supabase
+  // Insert-or-select: only set api_key on the first INSERT.
+  // If a concurrent caller already created the org (same clerk_user_id), return
+  // the existing row unchanged so the first writer's api_key is never clobbered.
+  const { data: inserted, error: insertErr } = await supabase
     .from("organizations")
-    .upsert(
-      { name, api_key: apiKey, clerk_user_id: clerkUserId },
-      { onConflict: "clerk_user_id" }
-    )
+    .insert({ name, api_key: apiKey, clerk_user_id: clerkUserId })
     .select()
     .single();
-  if (error) throw error;
-  return data as Organization;
+
+  if (!insertErr) return inserted as Organization;
+
+  // Postgres unique violation code — org already exists, fetch and return it
+  if (insertErr.code === "23505") {
+    const { data: existing, error: selectErr } = await supabase
+      .from("organizations")
+      .select("*")
+      .eq("clerk_user_id", clerkUserId)
+      .single();
+    if (selectErr) throw selectErr;
+    return existing as Organization;
+  }
+
+  throw insertErr;
 }
 
 // ─── Agents ───────────────────────────────────────────────────────────────────
-
-export async function getAgentsByOrg(orgId: string): Promise<Agent[]> {
-  const { data, error } = await supabase
-    .from("agents")
-    .select("*")
-    .eq("org_id", orgId)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []) as Agent[];
-}
 
 export async function getAgentById(orgId: string, agentId: string): Promise<Agent | null> {
   const { data, error } = await supabase
@@ -102,9 +105,10 @@ export async function createSession(
 ): Promise<Session> {
   const insert: Record<string, unknown> = { org_id: orgId, agent_id: agentId, status: "running" };
   if (sessionId) insert.id = sessionId;
+  // upsert on id (if provided) to handle concurrent ingest requests for the same session
   const { data, error } = await supabase
     .from("sessions")
-    .insert(insert)
+    .upsert(insert, { onConflict: sessionId ? "id" : undefined, ignoreDuplicates: true })
     .select()
     .single();
   if (error) throw error;
@@ -179,6 +183,7 @@ export async function insertEvent(
 // ─── Classifications ──────────────────────────────────────────────────────────
 
 export async function insertClassification(
+  orgId: string,
   sessionId: string,
   category: string,
   subcategory: string,
@@ -187,17 +192,18 @@ export async function insertClassification(
 ): Promise<Classification> {
   const { data, error } = await supabase
     .from("classifications")
-    .insert({ session_id: sessionId, category, subcategory, severity, reason })
+    .insert({ org_id: orgId, session_id: sessionId, category, subcategory, severity, reason })
     .select()
     .single();
   if (error) throw error;
   return data as Classification;
 }
 
-export async function getClassificationsBySession(sessionId: string): Promise<Classification[]> {
+export async function getClassificationsBySession(orgId: string, sessionId: string): Promise<Classification[]> {
   const { data, error } = await supabase
     .from("classifications")
     .select("*")
+    .eq("org_id", orgId)
     .eq("session_id", sessionId);
   if (error) throw error;
   return (data ?? []) as Classification[];
@@ -224,28 +230,22 @@ export interface OverviewStats {
 }
 
 export async function getOverviewStats(orgId: string): Promise<OverviewStats> {
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayISO = todayStart.toISOString();
+  const { data, error } = await supabase
+    .rpc("get_overview_stats", { p_org_id: orgId })
+    .single();
 
-  const [agentsRes, sessionsTodayRes] = await Promise.all([
-    supabase.from("agents").select("id", { count: "exact", head: true }).eq("org_id", orgId),
-    supabase.from("sessions").select("status, cost").eq("org_id", orgId).gte("started_at", todayISO),
-  ]);
-
-  if (agentsRes.error) {
-    logger.exception("[db] getOverviewStats agents query failed", agentsRes.error, { orgId });
-  }
-  if (sessionsTodayRes.error) {
-    logger.exception("[db] getOverviewStats sessions query failed", sessionsTodayRes.error, { orgId });
+  if (error) {
+    logger.exception("[db] getOverviewStats RPC failed", error, { orgId });
+    return { totalAgents: 0, sessionsToday: 0, failuresToday: 0, costToday: 0 };
   }
 
-  const totalAgents = agentsRes.count ?? 0;
-  const sessionsToday = sessionsTodayRes.data ?? [];
-  const failuresToday = sessionsToday.filter((s) => s.status === "failed").length;
-  const costToday = sessionsToday.reduce((sum, s) => sum + Number(s.cost ?? 0), 0);
-
-  return { totalAgents, sessionsToday: sessionsToday.length, failuresToday, costToday };
+  const row = data as { total_agents: number; sessions_today: number; failures_today: number; cost_today: number };
+  return {
+    totalAgents: Number(row.total_agents ?? 0),
+    sessionsToday: Number(row.sessions_today ?? 0),
+    failuresToday: Number(row.failures_today ?? 0),
+    costToday: Number(row.cost_today ?? 0),
+  };
 }
 
 export interface ClassificationWithSession extends Classification {
@@ -269,35 +269,19 @@ export interface AgentWithHealth extends Agent {
   failure_count: number;
 }
 
-export async function getAgentsWithHealth(orgId: string): Promise<AgentWithHealth[]> {
-  // Single query: agents + per-agent aggregates computed in the DB, not in memory
+export async function getAgentsWithHealth(orgId: string, limit = 200): Promise<AgentWithHealth[]> {
   const { data, error } = await supabase
-    .from("agents")
-    .select(`
-      *,
-      sessions!sessions_agent_id_fkey(status, started_at)
-    `)
-    .eq("org_id", orgId)
-    .order("created_at", { ascending: false });
+    .rpc("get_agents_with_health", { p_org_id: orgId })
+    .limit(limit);
 
   if (error) throw error;
 
-  return ((data ?? []) as (Agent & { sessions: { status: string; started_at: string }[] })[]).map(
-    (agent) => {
-      const sorted = [...agent.sessions].sort(
-        (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
-      );
-      return {
-        id: agent.id,
-        org_id: agent.org_id,
-        name: agent.name,
-        created_at: agent.created_at,
-        last_session_status: (sorted[0]?.status ?? null) as AgentWithHealth["last_session_status"],
-        session_count: sorted.length,
-        failure_count: sorted.filter((s) => s.status === "failed").length,
-      };
-    }
-  );
+  return ((data ?? []) as AgentWithHealth[]).map((row) => ({
+    ...row,
+    last_session_status: (row.last_session_status ?? null) as AgentWithHealth["last_session_status"],
+    session_count: Number(row.session_count),
+    failure_count: Number(row.failure_count),
+  }));
 }
 
 export interface CostByDay {
@@ -307,32 +291,22 @@ export interface CostByDay {
 }
 
 export async function getCostByDay(orgId: string, days: number): Promise<CostByDay[]> {
-  const since = new Date();
-  since.setDate(since.getDate() - days);
-
   const { data, error } = await supabase
-    .from("sessions")
-    .select("started_at, cost")
-    .eq("org_id", orgId)
-    .gte("started_at", since.toISOString())
-    .order("started_at", { ascending: true });
+    .rpc("get_cost_by_day", { p_org_id: orgId, p_days: days });
 
   if (error) throw error;
 
-  const grouped: Record<string, { cost: number; sessions: number }> = {};
-  for (const row of data ?? []) {
-    const date = new Date(row.started_at).toISOString().split("T")[0];
-    if (!grouped[date]) grouped[date] = { cost: 0, sessions: 0 };
-    grouped[date].cost += Number(row.cost ?? 0);
-    grouped[date].sessions += 1;
-  }
-
-  return Object.entries(grouped).map(([date, v]) => ({ date, ...v }));
+  return ((data ?? []) as CostByDay[]).map((row) => ({
+    date: row.date,
+    cost: Number(row.cost),
+    sessions: Number(row.sessions),
+  }));
 }
 
 // ─── Classification Updates ───────────────────────────────────────────────────
 
 export async function updateClassification(
+  orgId: string,
   classificationId: string,
   updates: {
     notes?: string | null;
@@ -343,6 +317,7 @@ export async function updateClassification(
   const { error } = await supabase
     .from("classifications")
     .update(updates)
+    .eq("org_id", orgId)
     .eq("id", classificationId);
   if (error) throw error;
 }
@@ -484,12 +459,13 @@ export async function createFix(
   return data as Fix;
 }
 
-export async function getFixesByOrg(orgId: string): Promise<Fix[]> {
+export async function getFixesByOrg(orgId: string, limit = 100): Promise<Fix[]> {
   const { data, error } = await supabase
     .from("fixes")
     .select("*")
     .eq("org_id", orgId)
-    .order("applied_at", { ascending: false });
+    .order("applied_at", { ascending: false })
+    .limit(limit);
   if (error) throw error;
   return (data ?? []) as Fix[];
 }
@@ -513,18 +489,9 @@ export interface FixImpact {
   deltaPercent: number | null;
 }
 
-export async function getFixImpact(orgId: string, fixId: string): Promise<FixImpact | null> {
-  // Get the fix
-  const { data: fixData, error: fixErr } = await supabase
-    .from("fixes")
-    .select("*")
-    .eq("org_id", orgId)
-    .eq("id", fixId)
-    .single();
-  if (fixErr || !fixData) return null;
-
-  const fix = fixData as Fix;
-  const appliedAt = new Date(fix.applied_at);
+export async function getFixImpact(orgId: string, fix: Fix): Promise<FixImpact | null> {
+  // Supabase returns timestamps as strings; coerce safely regardless of type
+  const appliedAt = new Date(fix.applied_at as unknown as string);
   const windowMs = 14 * 24 * 60 * 60 * 1000; // 14-day comparison window
   const beforeStart = new Date(appliedAt.getTime() - windowMs).toISOString();
   const afterEnd = new Date().toISOString();
@@ -536,7 +503,7 @@ export async function getFixImpact(orgId: string, fixId: string): Promise<FixImp
     .eq("session.org_id", orgId)
     .eq("category", fix.category)
     .gte("created_at", beforeStart)
-    .lt("created_at", fix.applied_at.toISOString());
+    .lt("created_at", appliedAt.toISOString());
 
   if (fix.agent_id) beforeQuery.eq("session.agent_id", fix.agent_id);
 
@@ -545,13 +512,15 @@ export async function getFixImpact(orgId: string, fixId: string): Promise<FixImp
     .select("id, session:sessions!inner(org_id, agent_id)", { count: "exact", head: true })
     .eq("session.org_id", orgId)
     .eq("category", fix.category)
-    .gte("created_at", fix.applied_at.toISOString())
+    .gte("created_at", appliedAt.toISOString())
     .lte("created_at", afterEnd);
 
   if (fix.agent_id) afterQuery.eq("session.agent_id", fix.agent_id);
 
   const [beforeRes, afterRes] = await Promise.all([beforeQuery, afterQuery]);
 
+  if (beforeRes.error) throw beforeRes.error;
+  if (afterRes.error) throw afterRes.error;
   const beforeCount = beforeRes.count ?? 0;
   const afterCount = afterRes.count ?? 0;
   const afterDays = Math.max(
@@ -596,14 +565,17 @@ export async function createInspectorRun(params: {
 
 export async function getInspectorRunsByOrg(
   orgId: string,
-  opts?: { agentId?: string; limit?: number }
+  opts?: { agentId?: string; limit?: number; offset?: number }
 ): Promise<InspectorRun[]> {
+  const limit = opts?.limit ?? 50;
+  const offset = opts?.offset ?? 0;
+
   let query = supabase
     .from("inspector_runs")
     .select("*")
     .eq("org_id", orgId)
     .order("created_at", { ascending: false })
-    .limit(opts?.limit ?? 50);
+    .range(offset, offset + limit - 1);
 
   if (opts?.agentId) {
     query = query.eq("agent_id", opts.agentId);

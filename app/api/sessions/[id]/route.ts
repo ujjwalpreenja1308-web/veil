@@ -7,8 +7,9 @@ import { withApiHandler, withRetry } from "@/lib/api-handler";
 
 export const GET = withApiHandler(async (
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) => {
+  const { id } = await params;
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -16,7 +17,7 @@ export const GET = withApiHandler(async (
   if (!orgId) return NextResponse.json({ error: "Organization not found" }, { status: 404 });
 
   const session = await withRetry(
-    () => getSessionById(orgId, params.id),
+    () => getSessionById(orgId, id),
     { label: "getSessionById" }
   );
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
@@ -24,7 +25,7 @@ export const GET = withApiHandler(async (
   const [events, classifications, agent] = await withRetry(
     () => Promise.all([
       getEventsBySession(orgId, session.id),
-      getClassificationsBySession(session.id),
+      getClassificationsBySession(orgId, session.id),
       getAgentById(orgId, session.agent_id),
     ]),
     { label: "getSessionDetail" }

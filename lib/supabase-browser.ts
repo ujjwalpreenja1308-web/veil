@@ -1,9 +1,10 @@
 // Browser-safe Supabase client — uses anon key, suitable for Realtime subscriptions
 // Only used client-side. Server code must use lib/supabase.ts (service role).
 import { createClient } from "@supabase/supabase-js";
+import { clientEnv } from "@/lib/env";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = clientEnv.SUPABASE_URL;
+const supabaseAnonKey = clientEnv.SUPABASE_ANON_KEY;
 
 // Singleton — re-use across the app to avoid multiple websocket connections
 let _client: ReturnType<typeof createClient> | null = null;

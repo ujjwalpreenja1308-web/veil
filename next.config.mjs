@@ -1,21 +1,37 @@
-import { withSentryConfig } from "@sentry/nextjs";
-
 /** @type {import('next').NextConfig} */
-const nextConfig = {};
+const isDev = process.env.NODE_ENV !== "production";
 
-export default withSentryConfig(nextConfig, {
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
+const nextConfig = {
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains; preload",
+          },
+          {
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'self'",
+              // unsafe-eval only in development (Next.js hot reload); never in production
+              `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https://clerk.veil.dev https://*.clerk.accounts.dev`,
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: blob: https:",
+              "font-src 'self'",
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.clerk.dev https://*.clerk.accounts.dev",
+              "frame-ancestors 'none'",
+            ].join("; "),
+          },
+        ],
+      },
+    ];
+  },
+};
 
-  // Upload source maps during build (requires SENTRY_AUTH_TOKEN)
-  silent: !process.env.CI,
-
-  // Automatically tree-shake Sentry debug code in production
-  disableLogger: true,
-
-  // Tunnel Sentry requests through your own domain to avoid ad-blockers
-  tunnelRoute: "/monitoring-tunnel",
-
-  // Hide source maps from the browser bundle
-  hideSourceMaps: true,
-});
+export default nextConfig;

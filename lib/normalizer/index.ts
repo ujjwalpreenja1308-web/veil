@@ -73,20 +73,33 @@ function flattenAttrs(attrs: RawAttr[] | undefined): Record<string, unknown> {
   return out;
 }
 
+// 1 MB payload size limit for OTLP (Veil-native uses 10 KB per event)
+const OTLP_MAX_PAYLOAD_BYTES = 1_048_576;
+
 // Normalize a single OTLP span into a NormalizedEvent.
 // session_id is conveyed via the resource attribute "service.name"
 // (which OpenLIT sets from application_name) or span attribute "session.id".
 function normalizeSpan(span: RawSpan, resourceAttrs: RawAttr[] | undefined, step: number): NormalizedEvent {
+  if (span === null || typeof span !== "object") {
+    throw Object.assign(new Error("Malformed OTLP span: expected object"), { status: 422 });
+  }
+
   const spanAttrs = span.attributes;
 
-  // Session ID: prefer span-level, fall back to resource service.name (set by veil SDK to session UUID)
-  const sessionId = String(
+  // Session ID: prefer span-level, fall back to resource service.name, then traceId
+  const rawSessionId =
     extractAttr(spanAttrs, "session.id") ??
     extractAttr(spanAttrs, "gen_ai.session.id") ??
     extractAttr(resourceAttrs, "service.name") ??
-    span.traceId ??
-    ""
-  );
+    span.traceId;
+
+  if (!rawSessionId) {
+    throw Object.assign(
+      new Error("OTLP span missing session identifier (session.id attribute, service.name resource attribute, or traceId)"),
+      { status: 422 }
+    );
+  }
+  const sessionId = String(rawSessionId);
 
   const type = String(
     span.name ??
@@ -96,10 +109,13 @@ function normalizeSpan(span: RawSpan, resourceAttrs: RawAttr[] | undefined, step
 
   const flatPayload = flattenAttrs(spanAttrs);
 
-  // Compute duration from span timestamps
-  if (span.startTimeUnixNano) {
-    flatPayload.duration_ns =
-      Number(span.endTimeUnixNano ?? 0) - Number(span.startTimeUnixNano);
+  // Compute duration from span timestamps; clamp to 0 to prevent negative values
+  if (span.startTimeUnixNano && span.endTimeUnixNano) {
+    const startNs = Number(span.startTimeUnixNano);
+    const endNs = Number(span.endTimeUnixNano);
+    if (!isNaN(startNs) && !isNaN(endNs)) {
+      flatPayload.duration_ns = Math.max(0, endNs - startNs);
+    }
   }
 
   if (span.status) {
@@ -121,13 +137,33 @@ function normalizeSpan(span: RawSpan, resourceAttrs: RawAttr[] | undefined, step
 // Normalize a full OTLP ExportTraceServiceRequest into multiple NormalizedEvents.
 // Each span becomes one event. Returns all events across all resource spans.
 export function normalizeOtlp(raw: unknown): NormalizedEvent[] {
+  // Basic shape validation before casting
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw Object.assign(new Error("OTLP payload must be a JSON object"), { status: 422 });
+  }
+
+  // Enforce payload size limit
+  const rawSize = JSON.stringify(raw).length;
+  if (rawSize > OTLP_MAX_PAYLOAD_BYTES) {
+    throw Object.assign(
+      new Error(`OTLP payload exceeds 1MB limit (got ${(rawSize / 1024).toFixed(1)} KB)`),
+      { status: 413 }
+    );
+  }
+
   const body = raw as RawOtlpPayload;
+  if (!Array.isArray(body.resourceSpans) && body.resourceSpans !== undefined) {
+    throw Object.assign(new Error("OTLP payload.resourceSpans must be an array"), { status: 422 });
+  }
+
   const events: NormalizedEvent[] = [];
   let globalStep = 0;
 
   for (const resourceSpan of body.resourceSpans ?? []) {
+    if (!resourceSpan || typeof resourceSpan !== "object") continue;
     const resourceAttrs = resourceSpan.resource?.attributes;
     for (const scopeSpan of resourceSpan.scopeSpans ?? []) {
+      if (!scopeSpan || typeof scopeSpan !== "object") continue;
       for (const span of scopeSpan.spans ?? []) {
         events.push(normalizeSpan(span, resourceAttrs, ++globalStep));
       }

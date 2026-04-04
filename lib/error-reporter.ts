@@ -32,7 +32,5 @@ export function reportError(report: ErrorReport): void {
         error: err instanceof Error ? err.message : String(err),
       });
     }
-
-
   })();
 }

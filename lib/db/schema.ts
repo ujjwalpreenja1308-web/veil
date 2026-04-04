@@ -40,6 +40,7 @@ export interface Event {
 export interface Classification {
   id: string;
   session_id: string;
+  org_id: string;
   category: string;
   subcategory: string;
   severity: "low" | "medium" | "high" | "critical";

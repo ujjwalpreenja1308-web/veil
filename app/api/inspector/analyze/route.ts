@@ -5,9 +5,10 @@ import { withApiHandler } from "@/lib/api-handler";
 import { getOrgId } from "@/lib/db/clerk";
 import { createInspectorRun } from "@/lib/db/queries";
 import { logger } from "@/lib/logger";
+import { serverEnv } from "@/lib/env";
 
-const INSPECTOR_SERVICE_URL = process.env.INSPECTOR_SERVICE_URL;
-const INSPECTOR_API_KEY = process.env.INSPECTOR_API_KEY;
+const INSPECTOR_SERVICE_URL = serverEnv.INSPECTOR_SERVICE_URL;
+const INSPECTOR_API_KEY = serverEnv.INSPECTOR_API_KEY;
 
 export const POST = withApiHandler(async (req: NextRequest) => {
   const { userId } = await auth();
@@ -16,8 +17,13 @@ export const POST = withApiHandler(async (req: NextRequest) => {
   const orgId = await getOrgId(userId);
   if (!orgId) return NextResponse.json({ error: "Organization not found" }, { status: 404 });
 
-  const body = await req.json();
-  const agentId: string = body?.agent_id;
+  let body: { agent_id?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+  const agentId: string = body?.agent_id ?? "";
   if (!agentId) return NextResponse.json({ error: "agent_id is required" }, { status: 400 });
 
   if (!INSPECTOR_SERVICE_URL || !INSPECTOR_API_KEY) {

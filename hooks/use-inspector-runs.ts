@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
+import { apiFetch } from "@/lib/api";
 import type { InspectorRun } from "@/lib/db/schema";
 
 // ─── useInspectorRuns ────────────────────────────────────────────────────────
@@ -37,7 +38,7 @@ export function useInspectorRuns(agentId?: string) {
 
   return useQuery<{ runs: InspectorRun[] }>({
     queryKey: ["inspector-runs", agentId],
-    queryFn: () => fetch(url).then((r) => r.json()),
+    queryFn: () => apiFetch<{ runs: InspectorRun[] }>(url),
     staleTime: 10_000,
   });
 }
@@ -75,7 +76,7 @@ export function useInspectorRun(runId: string | null) {
 
   return useQuery<{ run: InspectorRun }>({
     queryKey: ["inspector-run", runId],
-    queryFn: () => fetch(`/api/inspector/runs/${runId}`).then((r) => r.json()),
+    queryFn: () => apiFetch<{ run: InspectorRun }>(`/api/inspector/runs/${runId}`),
     enabled: !!runId,
     staleTime: 30_000,
   });
@@ -88,11 +89,11 @@ export function useRunInspector() {
 
   return useMutation<{ run: InspectorRun }, Error, { agent_id: string }>({
     mutationFn: ({ agent_id }) =>
-      fetch("/api/inspector/analyze", {
+      apiFetch<{ run: InspectorRun }>("/api/inspector/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ agent_id }),
-      }).then((r) => r.json()),
+      }),
     onSuccess: (_, { agent_id }) => {
       queryClient.invalidateQueries({ queryKey: ["inspector-runs", agent_id] });
       queryClient.invalidateQueries({ queryKey: ["inspector-runs", undefined] });

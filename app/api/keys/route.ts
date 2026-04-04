@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { getOrgByClerkUser } from "@/lib/db/clerk";
 import { generateApiKey } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import { logger } from "@/lib/logger";
 
 // GET — returns masked key for display (last 4 chars visible)
 export async function GET(_req: NextRequest) {
@@ -34,7 +35,7 @@ export async function POST(_req: NextRequest) {
     .eq("id", org.id);
 
   if (error) {
-    console.error("[keys] Failed to rotate key:", error);
+    logger.exception("[keys] Failed to rotate key", error, { orgId: org.id });
     return NextResponse.json({ error: "Failed to rotate key" }, { status: 500 });
   }
 

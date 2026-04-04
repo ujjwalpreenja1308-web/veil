@@ -17,8 +17,8 @@ const footerLinks = [
     title: 'Company',
     links: [
       { label: 'About', href: '#' },
-      { label: 'Privacy', href: '#' },
-      { label: 'Terms', href: '#' },
+      { label: 'Privacy', href: '/privacy' },
+      { label: 'Terms', href: '/terms' },
     ],
   },
 ];
@@ -109,8 +109,8 @@ export default function Footer() {
             &copy; {new Date().getFullYear()} Veil. All rights reserved.
           </p>
           <div className="flex gap-5">
-            <a href="#" className="text-[11px] text-white/15 hover:text-white/40 transition-colors">Privacy</a>
-            <a href="#" className="text-[11px] text-white/15 hover:text-white/40 transition-colors">Terms</a>
+            <a href="/privacy" className="text-[11px] text-white/15 hover:text-white/40 transition-colors">Privacy</a>
+            <a href="/terms" className="text-[11px] text-white/15 hover:text-white/40 transition-colors">Terms</a>
           </div>
         </div>
       </div>

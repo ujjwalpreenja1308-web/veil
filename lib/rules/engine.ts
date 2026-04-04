@@ -25,8 +25,15 @@ const LATENCY_CRITICAL_MS = 30_000;
 // Loop detection — same tool called N+ times in a session
 const LOOP_THRESHOLD = 5;
 
-export function classify(events: ClassifiableEvent[]): ClassificationResult | null {
-  if (!events.length) return null;
+// Goal drift — agent diverges from the original task objective
+const GOAL_DRIFT_TOPIC_SHIFT_THRESHOLD = 3;
+
+// Returns ALL matching classifications for a session (ordered by severity desc).
+// Callers that only want the worst failure can take results[0].
+export function classify(events: ClassifiableEvent[]): ClassificationResult[] {
+  if (!events.length) return [];
+
+  const results: ClassificationResult[] = [];
 
   // ── Context exhaustion ─────────────────────────────────────────────────────
   const contextError = events.find((e) => {
@@ -39,12 +46,12 @@ export function classify(events: ClassifiableEvent[]): ClassificationResult | nu
     );
   });
   if (contextError) {
-    return {
+    results.push({
       category: "context_exhaustion",
       subcategory: "token_limit_exceeded",
       severity: "high",
       reason: String(contextError.payload["gen_ai.error.message"] ?? contextError.payload.error_message ?? "Context length exceeded"),
-    };
+    });
   }
 
   // ── Prompt injection ───────────────────────────────────────────────────────
@@ -60,12 +67,12 @@ export function classify(events: ClassifiableEvent[]): ClassificationResult | nu
     return injectionPatterns.some((p) => p.test(prompt));
   });
   if (injectionEvent) {
-    return {
+    results.push({
       category: "prompt_injection",
       subcategory: "instruction_override_attempt",
       severity: "critical",
       reason: "Prompt injection pattern detected in input",
-    };
+    });
   }
 
   // ── Tool failure ───────────────────────────────────────────────────────────
@@ -75,12 +82,12 @@ export function classify(events: ClassifiableEvent[]): ClassificationResult | nu
     return (type.includes("tool") || type.includes("function_call")) && hasError;
   });
   if (toolFailure) {
-    return {
+    results.push({
       category: "tool_failure",
       subcategory: "tool_execution_error",
       severity: "medium",
       reason: String(toolFailure.payload["gen_ai.error.message"] ?? toolFailure.payload.error ?? "Tool execution failed"),
-    };
+    });
   }
 
   // ── RAG failure ────────────────────────────────────────────────────────────
@@ -90,12 +97,12 @@ export function classify(events: ClassifiableEvent[]): ClassificationResult | nu
     return (type.includes("retrieval") || type.includes("rag") || type.includes("vector")) && hasError;
   });
   if (ragFailure) {
-    return {
+    results.push({
       category: "rag_failure",
       subcategory: "retrieval_error",
       severity: "medium",
       reason: String(ragFailure.payload["gen_ai.error.message"] ?? ragFailure.payload.error ?? "RAG retrieval failed"),
-    };
+    });
   }
 
   // ── Infinite loop ──────────────────────────────────────────────────────────
@@ -107,12 +114,48 @@ export function classify(events: ClassifiableEvent[]): ClassificationResult | nu
   }
   const loopedTool = Object.entries(toolCallCounts).find(([, count]) => count >= LOOP_THRESHOLD);
   if (loopedTool) {
-    return {
+    results.push({
       category: "infinite_loop",
       subcategory: "repeated_tool_call",
       severity: "high",
       reason: `Tool "${loopedTool[0]}" called ${loopedTool[1]} times in a single session`,
-    };
+    });
+  }
+
+  // ── Goal drift ─────────────────────────────────────────────────────────────
+  // Detects when the agent shifts topic significantly across consecutive turns.
+  // Uses a simple heuristic: if the agent references a new subject in each of
+  // N+ consecutive prompts without completing the original task, it has drifted.
+  const goalDriftPatterns = [
+    /actually[,]? let('s| us) (try|do|focus on|talk about)/i,
+    /instead[,]? (let('s| us)|I('ll| will)) (try|do|focus on)/i,
+    /actually[,]? I (want|need|should) to/i,
+    /forget (the previous|that)[,]? let('s| us)/i,
+    /on second thought/i,
+    /actually[,]? never mind/i,
+  ];
+  const promptEvents = events.filter(
+    (e) => e.payload["gen_ai.prompt"] || e.payload.input || e.payload["gen_ai.completion"] || e.payload.output
+  );
+  let consecutiveDriftSignals = 0;
+  for (const e of promptEvents) {
+    const text = String(
+      e.payload["gen_ai.completion"] ?? e.payload.output ??
+      e.payload["gen_ai.prompt"] ?? e.payload.input ?? ""
+    );
+    if (goalDriftPatterns.some((p) => p.test(text))) {
+      consecutiveDriftSignals++;
+    } else {
+      consecutiveDriftSignals = 0;
+    }
+  }
+  if (consecutiveDriftSignals >= GOAL_DRIFT_TOPIC_SHIFT_THRESHOLD) {
+    results.push({
+      category: "goal_drift",
+      subcategory: "repeated_topic_shift",
+      severity: "medium",
+      reason: `Agent showed ${consecutiveDriftSignals} consecutive goal-drift signals (topic shifts without task completion)`,
+    });
   }
 
   // ── Cost anomaly ───────────────────────────────────────────────────────────
@@ -120,20 +163,19 @@ export function classify(events: ClassifiableEvent[]): ClassificationResult | nu
     return sum + Number(e.payload["gen_ai.usage.cost"] ?? e.payload.cost ?? 0);
   }, 0);
   if (totalCost >= COST_ANOMALY_CRITICAL) {
-    return {
+    results.push({
       category: "cost_anomaly",
       subcategory: "critical_cost_threshold",
       severity: "critical",
       reason: `Session cost $${totalCost.toFixed(4)} exceeded critical threshold ($${COST_ANOMALY_CRITICAL})`,
-    };
-  }
-  if (totalCost >= COST_ANOMALY_HIGH) {
-    return {
+    });
+  } else if (totalCost >= COST_ANOMALY_HIGH) {
+    results.push({
       category: "cost_anomaly",
       subcategory: "high_cost_threshold",
       severity: "high",
       reason: `Session cost $${totalCost.toFixed(4)} exceeded high threshold ($${COST_ANOMALY_HIGH})`,
-    };
+    });
   }
 
   // ── Latency spike ──────────────────────────────────────────────────────────
@@ -145,12 +187,12 @@ export function classify(events: ClassifiableEvent[]): ClassificationResult | nu
   if (slowEvent) {
     const durationMs = Number(slowEvent.payload.duration_ns ?? 0) / 1_000_000;
     const severity = durationMs >= LATENCY_CRITICAL_MS ? "critical" : "high";
-    return {
+    results.push({
       category: "latency_spike",
       subcategory: "slow_span",
       severity,
       reason: `Span "${slowEvent.type}" took ${Math.round(durationMs)}ms`,
-    };
+    });
   }
 
   // ── Hallucination ──────────────────────────────────────────────────────────
@@ -171,28 +213,32 @@ export function classify(events: ClassifiableEvent[]): ClassificationResult | nu
     return hallucinationPatterns.some((p) => p.test(output));
   });
   if (hallucinationEvent) {
-    return {
+    results.push({
       category: "hallucination",
       subcategory: "self_reported_uncertainty",
       severity: "high",
       reason: "Model output contains self-reported fabrication or unverifiable claim signals",
-    };
+    });
   }
 
   // ── Silent failure ─────────────────────────────────────────────────────────
-  const lastEvent = events[events.length - 1];
-  const hasOutput = events.some((e) =>
+  // Exclude the session.end event itself before checking — it's always present
+  // when classify() is called from the ingest route.
+  const substantiveEvents = events.filter((e) => e.type !== "session.end");
+  const hasOutput = substantiveEvents.some((e) =>
     e.payload["gen_ai.completion"] || e.payload.output || e.payload.result
   );
-  const hasError = events.some((e) => e.payload.error || e.payload["gen_ai.error.message"]);
-  if (!hasOutput && !hasError && lastEvent.type !== "session.end") {
-    return {
+  const hasError = substantiveEvents.some((e) => e.payload.error || e.payload["gen_ai.error.message"]);
+  if (substantiveEvents.length > 0 && !hasOutput && !hasError) {
+    results.push({
       category: "silent_failure",
       subcategory: "no_output_produced",
       severity: "medium",
       reason: "Session completed with no output and no explicit error",
-    };
+    });
   }
 
-  return null;
+  // Sort by severity (critical > high > medium > low)
+  const SEVERITY_ORDER = { critical: 4, high: 3, medium: 2, low: 1 };
+  return results.sort((a, b) => SEVERITY_ORDER[b.severity] - SEVERITY_ORDER[a.severity]);
 }

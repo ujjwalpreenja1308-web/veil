@@ -6,7 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "test:e2e:watch": "vitest --config vitest.e2e.config.ts",
+    "db:migrate": "echo 'Apply migrations in order from supabase/migrations/ via Supabase SQL editor or: supabase db push'"
   },
   "dependencies": {
     "@clerk/nextjs": "^5.7.5",
@@ -22,7 +28,6 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",
-    "@sentry/nextjs": "^10.46.0",
     "@supabase/supabase-js": "^2.100.1",
     "@tanstack/react-query": "^5.95.2",
     "@upstash/ratelimit": "^2.0.8",
@@ -34,7 +39,7 @@
     "framer-motion": "^12.38.0",
     "geist": "^1.7.0",
     "lucide-react": "^1.7.0",
-    "next": "14.2.35",
+    "next": "^15.5.14",
     "openai": "^6.33.0",
     "react": "^18",
     "react-dom": "^18",
@@ -47,15 +52,18 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@vitest/coverage-v8": "^4.1.2",
     "dotenv": "^17.3.1",
     "eslint": "^8",
-    "eslint-config-next": "14.2.35",
+    "eslint-config-next": "^15.5.14",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
     "tsx": "^4.21.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.2"
   }
 }

@@ -1,7 +1,18 @@
+import { Suspense } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/veil/AppSidebar";
 import { ErrorBoundary } from "@/components/veil/ErrorBoundary";
 import { RealtimeProvider } from "@/components/veil/RealtimeProvider";
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-4 animate-pulse">
+      <div className="h-8 w-48 rounded bg-muted" />
+      <div className="h-32 rounded bg-muted" />
+      <div className="h-32 rounded bg-muted" />
+    </div>
+  );
+}
 
 export default function DashboardLayout({
   children,
@@ -17,9 +28,11 @@ export default function DashboardLayout({
             <SidebarTrigger />
             <span className="text-sm font-semibold text-primary">Veil</span>
           </div>
-          <RealtimeProvider />
           <div className="p-6">
-            <ErrorBoundary>{children}</ErrorBoundary>
+            <ErrorBoundary>
+              <RealtimeProvider />
+              <Suspense fallback={<DashboardSkeleton />}>{children}</Suspense>
+            </ErrorBoundary>
           </div>
         </main>
       </div>
