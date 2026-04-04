@@ -79,6 +79,30 @@ services:
 ENV VEIL_API_KEY=""
 ```
 
+## Serverless functions
+
+In serverless environments the process is frozen immediately after your handler returns.
+Call `veil.flush()` before returning to guarantee all telemetry is delivered:
+
+```python
+import veil
+
+veil.init(api_key=os.environ["VEIL_API_KEY"], agent_name="My Lambda")
+
+def handler(event, context):
+    result = run_agent(event)
+    veil.flush()  # flush before the process freezes
+    return result
+```
+
+`veil.flush()` accepts an optional `timeout` (default 5 seconds):
+
+```python
+veil.flush(timeout=10.0)
+```
+
+It is a no-op if called more than once, and warns (but never raises) if called before `veil.init()`.
+
 ## CI/CD
 
 In GitHub Actions:

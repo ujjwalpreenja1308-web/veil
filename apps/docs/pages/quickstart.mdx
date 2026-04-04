@@ -58,6 +58,30 @@ print(result)
 
 Veil automatically captures the LLM call, tracks the session, and closes it when the script exits. You will see this session in your dashboard within seconds.
 
+## Running in a serverless function?
+
+If your agent runs inside a serverless function (AWS Lambda, Google Cloud Functions, Vercel, etc.), call `veil.flush()` before returning. The process gets frozen the moment your handler returns — without `flush()`, buffered telemetry is dropped and the session never closes in your dashboard.
+
+```python
+import veil
+from openai import OpenAI
+
+veil.init(api_key="vl_your_key_here", agent_name="Support Agent")
+client = OpenAI()
+
+def handler(event, context):
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": event["message"]}],
+    )
+    result = response.choices[0].message.content
+
+    veil.flush()  # always call before returning in serverless
+    return {"result": result}
+```
+
+`veil.flush()` is safe to call multiple times — only the first call does anything. See the [Python SDK reference](/sdk/python#veilfush) for full details.
+
 ## What happens next
 
 - Your agent appears in the **Agents** tab
